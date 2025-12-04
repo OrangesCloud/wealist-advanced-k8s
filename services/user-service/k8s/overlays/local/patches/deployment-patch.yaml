@@ -1,0 +1,18 @@
+# Local environment patches for user-service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: user-service
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

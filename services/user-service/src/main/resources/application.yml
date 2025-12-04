@@ -1,0 +1,208 @@
+spring:
+  application:
+    name: ${APP_NAME:wealist-user}
+
+  main:
+    allow-circular-references: true
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+      adjust-dates-to-context-time-zone: false
+    default-property-inclusion: non_null
+    mapper:
+      accept-case-insensitive-enums: true
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      # DB 연결 실패해도 앱 시작 허용 (EKS에서 pod 생존 보장)
+      # -1: 시작 시 연결 검증 안 함, 필요 시 lazy 연결
+      initialization-fail-timeout: -1
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        format_sql: ${JPA_FORMAT_SQL:false}
+    database-platform: ${JPA_DIALECT:org.hibernate.dialect.PostgreSQLDialect}
+    sql:
+      init:
+        mode: always
+    defer-datasource-initialization: true
+
+  file:
+    upload-dir: /app/upload
+
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:localhost}
+      port: ${SPRING_REDIS_PORT:6379}
+      password: ${SPRING_REDIS_PASSWORD:}
+
+  # ====================================
+  # 🔐 Google OAuth2 설정
+  # ====================================
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:}
+            client-secret: ${GOOGLE_CLIENT_SECRET:}
+            scope:
+              - email
+              - profile
+            redirect-uri: ${OAUTH2_CLIENT_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
+            authorization-grant-type: authorization_code
+            client-name: Google
+        provider:
+          google:
+            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
+            token-uri: https://oauth2.googleapis.com/token
+            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+            user-name-attribute: sub
+
+# AWS S3 설정
+# EC2에서는 IAM 역할 사용 (access-key, secret-key 불필요)
+# 로컬에서는 ~/.aws/credentials 또는 환경 변수 사용
+# MinIO 사용 시에만 access-key, secret-key 필요
+aws:
+  s3:
+    bucket: ${S3_BUCKET}
+    region: ${S3_REGION}
+    access-key: ${S3_ACCESS_KEY:}  # MinIO용만 필요 (선택적)
+    secret-key: ${S3_SECRET_KEY:}  # MinIO용만 필요 (선택적)
+    endpoint: ${S3_ENDPOINT:}      # MinIO용 (선택적)
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+    display-request-duration: true
+    disable-swagger-default-url: true
+
+server:
+  port: ${USER_SERVICE_PORT:8080}
+  error:
+    whitelabel.enabled: false
+    include-exception: true
+  # 💡 [핵심 추가]: 로컬 환경에서는 Context Path를 사용하지 않음 (빈 문자열)
+  servlet:
+    context-path: ""
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-ms: ${JWT_ACCESS_TOKEN_EXPIRATION_MS}
+  refresh-token-expiration-ms: ${JWT_REFRESH_TOKEN_EXPIRATION_MS}
+
+# OAuth2 기본 local 값으로 설정
+oauth2:
+  # 💡 [로컬/배포 분리 적용됨] Success Handler 최종 Redirect URL
+  redirect-url: ${OAUTH2_REDIRECT_URL_ENV:http://localhost:3000/oauth/callback}
+logging:
+  level:
+    OrangeCloud: DEBUG
+    org.springframework.security: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers,env,beans
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+      # Kubernetes probe 지원 활성화
+      probes:
+        enabled: true
+      # Health group 정의: liveness는 서비스 자체만, readiness는 DB/Redis 포함
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db, redis
+    export:
+      enabled: true
+  # Health indicator 활성화
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    db:
+      enabled: true
+    redis:
+      enabled: true
+  metrics:
+    export:
+      enabled: true
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      percentiles:
+        http.server.requests: 0.5,0.95,0.99
+      sla:
+        http.server.requests: 100ms,500ms,1s
+
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+# Sample data generation configuration
+sample-data:
+  enabled: ${SAMPLE_DATA_ENABLED:false}
+
+# Board service URL configuration
+board-service:
+  url: ${BOARD_SERVICE_URL:http://localhost:8081}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+sample-data:
+  enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: staging
+
+sample-data:
+  enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: production
+
+sample-data:
+  enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: aws # AWS 프로파일 활성화 시 오버라이드
+

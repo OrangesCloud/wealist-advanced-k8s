@@ -1,0 +1,16 @@
+# Wealist Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wealist
+  labels:
+    app.kubernetes.io/part-of: wealist
+---
+# Local development namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wealist-local
+  labels:
+    app.kubernetes.io/part-of: wealist
+    environment: local

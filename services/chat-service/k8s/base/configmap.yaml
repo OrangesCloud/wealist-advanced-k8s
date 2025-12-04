@@ -1,0 +1,9 @@
+# chat-service ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-service-config
+data:
+  SERVER_PORT: "8001"
+  SERVER_BASE_PATH: "/api/chats"
+  # TODO: Add more config values

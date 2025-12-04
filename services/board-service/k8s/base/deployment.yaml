@@ -1,0 +1,23 @@
+# board-service Deployment (Go)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-service
+  labels:
+    app: board-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: board-service
+  template:
+    metadata:
+      labels:
+        app: board-service
+    spec:
+      containers:
+        - name: board-service
+          image: wealist/board-service:latest
+          ports:
+            - containerPort: 8000
+          # TODO: Add env, resources, probes

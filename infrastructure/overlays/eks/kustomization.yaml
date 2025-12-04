@@ -1,0 +1,16 @@
+# Infrastructure - EKS overlay
+# In EKS, we typically use managed services (RDS, ElastiCache)
+# This overlay provides ExternalName services to connect to them
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base/namespace.yaml
+  # Don't include StatefulSets - use managed services instead
+  - external-postgres.yaml
+  - external-redis.yaml
+
+namespace: wealist
+
+# In production: Use External Secrets Operator with Vault
+# secretGenerator will be replaced by ExternalSecret CRD

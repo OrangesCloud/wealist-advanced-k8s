@@ -1,0 +1,23 @@
+# chat-service Deployment (Go)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-service
+  labels:
+    app: chat-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-service
+  template:
+    metadata:
+      labels:
+        app: chat-service
+    spec:
+      containers:
+        - name: chat-service
+          image: wealist/chat-service:latest
+          ports:
+            - containerPort: 8001
+          # TODO: Add env, resources, probes

@@ -1,0 +1,15 @@
+# =============================================================================
+# AWS Environment Configuration
+# =============================================================================
+# This profile is activated when SPRING_PROFILES_ACTIVE=aws
+# Used for EC2 deployment with ALB path-based routing
+#
+# Context path /api/users allows ALB to route requests like:
+#   Client: GET /api/users/api/workspaces/all
+#   ALB: Forward to User Service
+#   User Service: Process as GET /api/workspaces/all
+# =============================================================================
+
+server:
+  servlet:
+    context-path: /api/users

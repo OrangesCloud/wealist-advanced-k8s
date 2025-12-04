@@ -1,0 +1,9 @@
+# user-service ConfigMap
+# TODO: Add environment-specific configurations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+data:
+  SERVER_PORT: "8080"
+  # TODO: Add more config values

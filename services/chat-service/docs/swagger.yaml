@@ -1,0 +1,766 @@
+basePath: /api/chats
+definitions:
+  ChatResponse:
+    properties:
+      chatId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      chatName:
+        example: 프로젝트 A 팀 채팅
+        type: string
+      chatType:
+        enum:
+        - DM
+        - GROUP
+        - PROJECT
+        example: PROJECT
+        type: string
+      createdAt:
+        example: "2025-11-20T12:00:00Z"
+        type: string
+      createdBy:
+        example: 550e8400-e29b-41d4-a716-446655440003
+        type: string
+      projectId:
+        example: 550e8400-e29b-41d4-a716-446655440002
+        type: string
+      updatedAt:
+        example: "2025-11-20T12:00:00Z"
+        type: string
+      workspaceId:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+    type: object
+  MessageResponse:
+    properties:
+      chatId:
+        example: 550e8400-e29b-41d4-a716-446655440001
+        type: string
+      content:
+        example: 안녕하세요!
+        type: string
+      createdAt:
+        example: "2025-11-20T12:00:00Z"
+        type: string
+      fileName:
+        example: document.pdf
+        type: string
+      fileSize:
+        example: 1024000
+        type: integer
+      fileUrl:
+        example: https://example.com/file.pdf
+        type: string
+      messageId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      messageType:
+        enum:
+        - TEXT
+        - IMAGE
+        - FILE
+        example: TEXT
+        type: string
+      updatedAt:
+        example: "2025-11-20T12:00:00Z"
+        type: string
+      userId:
+        example: 550e8400-e29b-41d4-a716-446655440002
+        type: string
+    type: object
+  handler.AddParticipantsRequest:
+    properties:
+      userIds:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - userIds
+    type: object
+  handler.CreateChatRequest:
+    properties:
+      chatName:
+        type: string
+      chatType:
+        enum:
+        - DM
+        - GROUP
+        - PROJECT
+        type: string
+      participantIds:
+        items:
+          type: string
+        type: array
+      projectId:
+        type: string
+      workspaceId:
+        type: string
+    required:
+    - chatType
+    - workspaceId
+    type: object
+  handler.MarkAsReadRequest:
+    properties:
+      messageIds:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - messageIds
+    type: object
+  handler.SendMessageRequest:
+    properties:
+      content:
+        type: string
+      fileName:
+        type: string
+      fileSize:
+        type: integer
+      fileUrl:
+        type: string
+      messageType:
+        enum:
+        - TEXT
+        - IMAGE
+        - FILE
+        type: string
+    required:
+    - content
+    type: object
+host: localhost:8001
+info:
+  contact:
+    email: support@wealist.co.kr
+    name: API Support
+    url: http://www.wealist.co.kr/support
+  description: 실시간 채팅 서비스 API
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Chat Service API
+  version: "1.0"
+paths:
+  /chats:
+    post:
+      consumes:
+      - application/json
+      description: 새로운 채팅방을 생성합니다
+      parameters:
+      - description: 채팅방 생성 정보
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.CreateChatRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/ChatResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 채팅방 생성
+      tags:
+      - chat
+  /chats/{chatId}:
+    delete:
+      description: 채팅방을 삭제합니다 (Soft Delete)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Chat deleted successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 채팅방 삭제
+      tags:
+      - chat
+    get:
+      description: 특정 채팅방의 상세 정보를 조회합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ChatResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 채팅방 조회
+      tags:
+      - chat
+  /chats/{chatId}/participants:
+    post:
+      consumes:
+      - application/json
+      description: 채팅방에 새로운 참여자를 추가합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      - description: 추가할 사용자 ID 목록
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.AddParticipantsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Participants added successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 참여자 추가
+      tags:
+      - chat
+  /chats/{chatId}/participants/{userId}:
+    delete:
+      description: 채팅방에서 참여자를 제거합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'message: Participant removed successfully'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 참여자 제거
+      tags:
+      - chat
+  /chats/my:
+    get:
+      description: 현재 사용자가 참여 중인 모든 채팅방을 조회합니다
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/ChatResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 내 채팅방 목록
+      tags:
+      - chat
+  /chats/workspace/{workspaceId}:
+    get:
+      description: 워크스페이스의 모든 채팅방을 조회합니다
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: workspaceId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/ChatResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 워크스페이스 채팅방 목록
+      tags:
+      - chat
+  /messages/{chatId}:
+    get:
+      description: 채팅방의 메시지 히스토리를 조회합니다 (페이지네이션)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      - default: 50
+        description: '페이지 크기 (기본: 50, 최대: 100)'
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: '오프셋 (기본: 0)'
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/MessageResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 메시지 히스토리 조회
+      tags:
+      - message
+    post:
+      consumes:
+      - application/json
+      description: 채팅방에 메시지를 전송합니다 (REST fallback, WebSocket 권장)
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      - description: 메시지 내용
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 메시지 전송
+      tags:
+      - message
+  /messages/{chatId}/last-read:
+    put:
+      description: 채팅방의 마지막 읽은 시간을 현재 시간으로 업데이트합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 마지막 읽은 시간 업데이트
+      tags:
+      - message
+  /messages/{chatId}/unread:
+    get:
+      description: 채팅방의 읽지 않은 메시지 수를 조회합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 읽지 않은 메시지 수 조회
+      tags:
+      - message
+  /messages/{messageId}:
+    delete:
+      description: 메시지를 삭제합니다 (Soft Delete)
+      parameters:
+      - description: Message ID
+        in: path
+        name: messageId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 메시지 삭제
+      tags:
+      - message
+  /messages/read:
+    post:
+      consumes:
+      - application/json
+      description: 여러 메시지를 읽음으로 처리합니다
+      parameters:
+      - description: 읽은 메시지 ID 목록
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.MarkAsReadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 메시지 읽음 처리
+      tags:
+      - message
+  /presence/online:
+    get:
+      description: 현재 온라인인 사용자 목록을 가져옵니다
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              items:
+                type: string
+              type: array
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 온라인 사용자 목록
+      tags:
+      - presence
+  /presence/status/{userId}:
+    get:
+      description: 특정 사용자가 온라인인지 확인합니다
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 사용자 온라인 여부 확인
+      tags:
+      - presence
+  /ws/chat/{chatId}:
+    get:
+      description: 채팅방 WebSocket에 연결합니다
+      parameters:
+      - description: Chat ID
+        in: path
+        name: chatId
+        required: true
+        type: string
+      - description: JWT Access Token
+        in: query
+        name: token
+        required: true
+        type: string
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: WebSocket 연결
+      tags:
+      - websocket
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

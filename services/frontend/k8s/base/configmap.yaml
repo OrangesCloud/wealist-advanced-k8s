@@ -1,0 +1,9 @@
+# frontend ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  # TODO: Add frontend config values
+  # Note: Frontend configs are typically baked into the image at build time
+  PLACEHOLDER: "true"

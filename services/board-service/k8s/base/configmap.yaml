@@ -1,0 +1,8 @@
+# board-service ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: board-service-config
+data:
+  BOARD_SERVER_PORT: "8000"
+  # TODO: Add more config values

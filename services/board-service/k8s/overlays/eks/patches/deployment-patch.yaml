@@ -1,0 +1,18 @@
+# EKS environment patches for board-service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-service
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: board-service
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

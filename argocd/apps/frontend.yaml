@@ -1,0 +1,21 @@
+# Frontend Application
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: wealist-frontend
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: wealist
+  source:
+    repoURL: https://github.com/YOUR_ORG/wealist-project-advanced.git  # TODO: Update
+    targetRevision: HEAD
+    path: services/frontend/k8s/overlays/eks  # Change to 'local' for local env
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: wealist
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

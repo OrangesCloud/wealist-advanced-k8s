@@ -1,0 +1,19 @@
+# user-service - Local overlay (kind, k3s, minikube)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: wealist-local
+
+patches:
+  - path: patches/deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: user-service
+
+# Local-specific configurations
+# - Lower resource limits
+# - NodePort for local access
+# - Local image registry

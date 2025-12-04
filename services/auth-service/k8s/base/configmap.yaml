@@ -1,0 +1,8 @@
+# auth-service ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+data:
+  SERVER_PORT: "8090"
+  # TODO: Add more config values

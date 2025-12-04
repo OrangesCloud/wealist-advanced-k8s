@@ -1,0 +1,117 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.6'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'jacoco'
+}
+java {
+    sourceCompatibility = '21'  // 또는 '21'
+    targetCompatibility = '21'  // 또는 '21'
+}
+
+jacoco {
+    toolVersion = "0.8.11" // Use a recent version of JaCoCo
+}
+
+tasks.jacocoTestReport {
+    dependsOn tasks.test // Ensure tests run before report generation
+    reports {
+        xml.required = true
+        html.required = true
+        csv.required = false
+        html.outputLocation = layout.buildDirectory.dir('reports/jacocoHtml')
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/OrangeCloud/UserRepo/UserRepoApplication.class',
+                '**/OrangeCloud/UserRepo/config/**',
+                '**/OrangeCloud/UserRepo/dto/**',
+                '**/OrangeCloud/UserRepo/entity/**',
+                '**/OrangeCloud/UserRepo/exception/**',
+                '**/OrangeCloud/UserRepo/filter/**',
+                '**/OrangeCloud/UserRepo/util/**',
+                '**/OrangeCloud/UserRepo/*Application.class'
+            ])
+        }))
+    }
+
+}
+
+tasks.test {
+    finalizedBy tasks.jacocoTestReport // Ensure jacocoTestReport runs after test
+}
+
+group = 'OrangeCloud'
+version = '0.0.1-SNAPSHOT'
+description = 'Spring boot Porject '
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.19.0'
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // AWS SDK for S3
+    implementation platform('software.amazon.awssdk:bom:2.20.26')
+    implementation 'software.amazon.awssdk:s3'
+    implementation 'software.amazon.awssdk:auth'
+
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.session:spring-session-data-redis'
+
+    // For Structured Logging
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    //google oauth2
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    //promethues
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.0'
+
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testImplementation 'org.springframework.security:spring-security-test'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testRuntimeOnly 'com.h2database:h2'
+	
+	// jqwik for property-based testing
+	testImplementation 'net.jqwik:jqwik:1.8.2'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
+
+bootRun {
+    systemProperty 'spring.jpa.hibernate.ddl-auto', 'update'
+}

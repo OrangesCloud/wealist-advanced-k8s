@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} %5p ${PID:- } --- [%t] %-40.40logger{39} : %m%n"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <level>level</level>
+                <thread>thread</thread>
+                <message>message</message>
+                <logger>logger</logger>
+                <stackTrace>stackTrace</stackTrace>
+                <callerData>callerData</callerData>
+                <mdc>mdc</mdc>
+            </fieldNames>
+            <customFields>{"app_name":"${APP_NAME:-wealist-user}"}</customFields>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+    <logger name="org.springframework" level="INFO"/>
+    <logger name="org.hibernate" level="INFO"/>
+    <logger name="com.wealist" level="DEBUG"/>
+
+</configuration>

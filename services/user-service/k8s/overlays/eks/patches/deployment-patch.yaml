@@ -1,0 +1,20 @@
+# EKS environment patches for user-service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user-service
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: user-service
+          # TODO: Update with ECR image
+          # image: <account>.dkr.ecr.<region>.amazonaws.com/wealist/user-service:latest
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"

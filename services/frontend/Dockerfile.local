@@ -1,0 +1,23 @@
+# Multi-stage build for local development
+FROM node:20-alpine AS base
+
+# --- Base Stage ---
+WORKDIR /app
+ENV NPM_CONFIG_LOGLEVEL=warn
+
+# pnpm 설치
+RUN npm install -g pnpm
+
+# --- Dependency Stage (캐시 활용) ---
+FROM base AS dependencies
+# package.json만 복사하여 의존성 레이어 캐시를 활용
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+# --- Development Stage ---
+# 개발 환경은 의존성 설치까지만 완료하고,
+# 소스코드 복사 및 pnpm dev 명령어는 docker-compose.yml에서 처리합니다.
+FROM dependencies AS development
+
+# 이 이미지를 기반으로 pnpm dev 실행 및 Volume Mount를 사용합니다.
+# CMD는 docker-compose.yml에서 오버라이드 됩니다.

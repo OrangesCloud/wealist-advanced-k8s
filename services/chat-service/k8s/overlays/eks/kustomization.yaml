@@ -1,0 +1,14 @@
+# chat-service - EKS overlay
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: wealist
+
+patches:
+  - path: patches/deployment-patch.yaml
+    target:
+      kind: Deployment
+      name: chat-service

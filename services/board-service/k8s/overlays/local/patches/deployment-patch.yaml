@@ -1,0 +1,18 @@
+# Local environment patches for board-service (Go - lightweight)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-service
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+        - name: board-service
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "250m"
