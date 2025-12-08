@@ -103,13 +103,13 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
   const getChatDisplayName = (chat: Chat): string => {
     if (chat.chatType === 'DM') {
       const other = getOtherParticipant(chat);
-      return other?.userName || '알 수 없음';
+      return other?.nickName || other?.userEmail || '알 수 없음';
     }
     if (chat.chatName) return chat.chatName;
     const others = getOtherParticipants(chat);
     if (others.length === 0) return '그룹 채팅';
-    if (others.length <= 3) return others.map((m) => m.userName).join(', ');
-    return `${others.slice(0, 2).map((m) => m.userName).join(', ')} 외 ${others.length - 2}명`;
+    if (others.length <= 3) return others.map((m) => m.nickName || m.userEmail || 'Unknown').join(', ');
+    return `${others.slice(0, 2).map((m) => m.nickName || m.userEmail || 'Unknown').join(', ')} 외 ${others.length - 2}명`;
   };
 
   // 마지막 메시지 시간 포맷
@@ -147,8 +147,8 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
       const chat = await createChat({
         workspaceId,
         chatType,
-        chatName: groupName || undefined,
-        participantIds: selectedMembers,
+        chatName: groupName || (chatType === 'DM' ? 'DM' : 'Group Chat'),
+        participants: selectedMembers,
       });
 
       console.log('✅ 채팅방 생성 완료:', chat);
@@ -189,14 +189,14 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
           {other?.profileImageUrl ? (
             <img
               src={other.profileImageUrl}
-              alt={other.userName}
+              alt={other?.nickName || other?.userEmail}
               className="w-12 h-12 rounded-full object-cover"
             />
           ) : (
             <div
               className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold ${getColorByIndex(0)}`}
             >
-              {other?.userName?.[0] || '?'}
+              {other?.nickName?.[0] || other?.userEmail?.[0] || '?'}
             </div>
           )}
           {/* 읽지 않은 메시지 빨간 점 */}
@@ -228,14 +228,14 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
                 {member.profileImageUrl ? (
                   <img
                     src={member.profileImageUrl}
-                    alt={member.userName}
+                    alt={member.nickName || member.userEmail}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <div
                     className={`w-full h-full flex items-center justify-center text-white text-xs font-bold ${getColorByIndex(index)}`}
                   >
-                    {member.userName[0]}
+                    {member.nickName?.[0] || member.userEmail?.[0] || '?'}
                   </div>
                 )}
               </div>
@@ -303,7 +303,7 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
                   key={userId}
                   className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full flex items-center gap-1"
                 >
-                  {member?.userName || '알 수 없음'}
+                  {member?.nickName || member?.userEmail || '알 수 없음'}
                   <button
                     onClick={() => toggleMemberSelection(userId)}
                     className="hover:text-blue-900"
@@ -334,21 +334,21 @@ export const ChatListPanel: React.FC<ChatListPanelProps> = ({
                     {member.profileImageUrl ? (
                       <img
                         src={member.profileImageUrl}
-                        alt={member.userName}
+                        alt={member.nickName || member.userEmail}
                         className="w-10 h-10 rounded-full object-cover"
                       />
                     ) : (
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold ${getColorByIndex(index)}`}
                       >
-                        {member.userName[0]}
+                        {member.nickName?.[0] || member.userEmail?.[0] || '?'}
                       </div>
                     )}
                   </div>
 
                   {/* 이름 */}
                   <div className="flex-1">
-                    <p className="font-medium text-sm text-gray-900">{member.userName}</p>
+                    <p className="font-medium text-sm text-gray-900">{member.nickName || member.userEmail || 'Unknown'}</p>
                     <p className="text-xs text-gray-500">{member.userEmail}</p>
                   </div>
 

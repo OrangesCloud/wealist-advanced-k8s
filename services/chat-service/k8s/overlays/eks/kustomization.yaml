@@ -1,14 +1,25 @@
-# chat-service - EKS overlay
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: wealist-prod
 
 resources:
   - ../../base
 
-namespace: wealist
+images:
+  - name: chat-service
+    newName: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/wealist/chat-service
+    newTag: ${IMAGE_TAG}
+
+replicas:
+  - name: chat-service
+    count: 2
 
 patches:
-  - path: patches/deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: chat-service
+  - target:
+      kind: ConfigMap
+      name: chat-service-config
+    patch: |-
+      - op: replace
+        path: /data/DB_HOST
+        value: "${RDS_ENDPOINT}"

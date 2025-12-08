@@ -1,4 +1,3 @@
-# auth-service Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +16,30 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: wealist/auth-service:latest
+          image: auth-service:latest
           ports:
-            - containerPort: 8090
-          # TODO: Add env, resources, probes
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: auth-service-config
+            - secretRef:
+                name: auth-service-secret
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

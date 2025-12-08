@@ -618,7 +618,7 @@ export const getAttachments = async (boardId: string): Promise<AttachmentRespons
   if (USE_MOCK_DATA) {
     return [
       {
-        id: 'mock-file-1',
+        attachmentId: 'mock-file-1',
         entityId: boardId,
         entityType: 'BOARD',
         fileName: 'mock.pdf',

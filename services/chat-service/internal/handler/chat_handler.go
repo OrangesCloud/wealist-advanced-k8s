@@ -1,302 +1,257 @@
-// internal/handler/chat_handler.go
 package handler
 
 import (
-	"chat-service/internal/middleware"
-	"chat-service/internal/model"
+	"chat-service/internal/domain"
 	"chat-service/internal/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type ChatHandler struct {
-	chatService service.ChatService
+	chatService     *service.ChatService
+	presenceService *service.PresenceService
+	logger          *zap.Logger
 }
 
-func NewChatHandler(chatService service.ChatService) *ChatHandler {
+func NewChatHandler(
+	chatService *service.ChatService,
+	presenceService *service.PresenceService,
+	logger *zap.Logger,
+) *ChatHandler {
 	return &ChatHandler{
-		chatService: chatService,
+		chatService:     chatService,
+		presenceService: presenceService,
+		logger:          logger,
 	}
 }
 
-type CreateChatRequest struct {
-	WorkspaceID    string   `json:"workspaceId" binding:"required"`
-	ProjectID      *string  `json:"projectId"`
-	ChatType       string   `json:"chatType" binding:"required,oneof=DM GROUP PROJECT"`
-	ChatName       string   `json:"chatName"`
-	ParticipantIDs []string `json:"participantIds"`
-}
-
-type AddParticipantsRequest struct {
-	UserIDs []string `json:"userIds" binding:"required,min=1"`
-}
-
-// CreateChat godoc
-// @Summary      채팅방 생성
-// @Description  새로운 채팅방을 생성합니다
-// @Tags         chat
-// @Accept       json
-// @Produce      json
-// @Param        request body CreateChatRequest true "채팅방 생성 정보"
-// @Success      201 {object} ChatResponse
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /chats [post]
-// @Security     BearerAuth
+// CreateChat creates a new chat
 func (h *ChatHandler) CreateChat(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	var req CreateChatRequest
+	var req domain.CreateChatRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": err.Error()},
+		})
 		return
 	}
 
-	workspaceID, err := uuid.Parse(req.WorkspaceID)
+	chat, err := h.chatService.CreateChat(c.Request.Context(), &req, userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid workspace ID"})
-		return
-	}
-
-	var projectID *uuid.UUID
-	if req.ProjectID != nil {
-		pid, err := uuid.Parse(*req.ProjectID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid project ID"})
-			return
-		}
-		projectID = &pid
-	}
-
-	// 참여자 ID 변환
-	participantIDs := make([]uuid.UUID, 0, len(req.ParticipantIDs))
-	for _, idStr := range req.ParticipantIDs {
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid participant ID: " + idStr})
-			return
-		}
-		participantIDs = append(participantIDs, id)
-	}
-
-	chat, err := h.chatService.CreateChat(
-		workspaceID,
-		projectID,
-		model.ChatType(req.ChatType),
-		req.ChatName,
-		userID,
-		participantIDs,
-	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.Error("failed to create chat", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to create chat"},
+		})
 		return
 	}
 
 	c.JSON(http.StatusCreated, chat)
 }
 
+// GetMyChats returns user's chats
+func (h *ChatHandler) GetMyChats(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
 
-// GetChat godoc
-// @Summary      채팅방 조회
-// @Description  특정 채팅방의 상세 정보를 조회합니다
-// @Tags         chat
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {object} ChatResponse
-// @Failure      400 {object} map[string]string
-// @Failure      404 {object} map[string]string
-// @Router       /chats/{chatId} [get]
-// @Security     BearerAuth
-func (h *ChatHandler) GetChat(c *gin.Context) {
-	chatID, err := uuid.Parse(c.Param("chatId"))
+	chats, err := h.chatService.GetUserChats(c.Request.Context(), userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		h.logger.Error("failed to get user chats", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to get chats"},
+		})
 		return
 	}
 
-	chat, err := h.chatService.GetChat(chatID)
+	c.JSON(http.StatusOK, chats)
+}
+
+// GetWorkspaceChats returns chats in a workspace
+func (h *ChatHandler) GetWorkspaceChats(c *gin.Context) {
+	workspaceID, err := uuid.Parse(c.Param("workspaceId"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Chat not found"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid workspace ID"},
+		})
+		return
+	}
+
+	chats, err := h.chatService.GetWorkspaceChats(c.Request.Context(), workspaceID)
+	if err != nil {
+		h.logger.Error("failed to get workspace chats", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to get chats"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, chats)
+}
+
+// GetChat returns a specific chat
+func (h *ChatHandler) GetChat(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	chatID, err := uuid.Parse(c.Param("chatId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
+		return
+	}
+
+	// Verify user is in chat
+	inChat, err := h.chatService.IsUserInChat(c.Request.Context(), chatID, userID)
+	if err != nil || !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
+		return
+	}
+
+	chat, err := h.chatService.GetChatByID(c.Request.Context(), chatID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "NOT_FOUND", "message": "Chat not found"},
+		})
 		return
 	}
 
 	c.JSON(http.StatusOK, chat)
 }
 
-// GetWorkspaceChats godoc
-// @Summary      워크스페이스 채팅방 목록
-// @Description  워크스페이스의 모든 채팅방을 조회합니다
-// @Tags         chat
-// @Produce      json
-// @Param        workspaceId path string true "Workspace ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {array} ChatResponse
-// @Failure      400 {object} map[string]string
-// @Router       /chats/workspace/{workspaceId} [get]
-// @Security     BearerAuth
-func (h *ChatHandler) GetWorkspaceChats(c *gin.Context) {
-	workspaceID, err := uuid.Parse(c.Param("workspaceId"))
+// DeleteChat soft deletes a chat
+func (h *ChatHandler) DeleteChat(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
+	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid workspace ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	chats, err := h.chatService.GetWorkspaceChats(workspaceID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// Verify user is in chat
+	inChat, _ := h.chatService.IsUserInChat(c.Request.Context(), chatID, userID)
+	if !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, chats)
+	if err := h.chatService.DeleteChat(c.Request.Context(), chatID); err != nil {
+		h.logger.Error("failed to delete chat", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to delete chat"},
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
-// GetMyChats godoc
-// @Summary      내 채팅방 목록
-// @Description  현재 사용자가 참여 중인 모든 채팅방을 조회합니다 (unreadCount 포함)
-// @Tags         chat
-// @Produce      json
-// @Success      200 {array} ChatResponse
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /chats/my [get]
-// @Security     BearerAuth
-func (h *ChatHandler) GetMyChats(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
-
-	// 🔥 unreadCount 포함된 채팅방 목록 반환
-	chats, err := h.chatService.GetUserChatsWithUnread(userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, chats)
-}
-
-// AddParticipants godoc
-// @Summary      참여자 추가
-// @Description  채팅방에 새로운 참여자를 추가합니다
-// @Tags         chat
-// @Accept       json
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Param        request body AddParticipantsRequest true "추가할 사용자 ID 목록"
-// @Success      200 {object} map[string]string "message: Participants added successfully"
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /chats/{chatId}/participants [post]
-// @Security     BearerAuth
+// AddParticipants adds participants to a chat
 func (h *ChatHandler) AddParticipants(c *gin.Context) {
+	userID := c.MustGet("user_id").(uuid.UUID)
+
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	var req AddParticipantsRequest
+	var req struct {
+		UserIDs []uuid.UUID `json:"userIds" binding:"required,min=1"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": err.Error()},
+		})
 		return
 	}
 
-	userIDs := make([]uuid.UUID, 0, len(req.UserIDs))
-	for _, idStr := range req.UserIDs {
-		id, err := uuid.Parse(idStr)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID: " + idStr})
-			return
-		}
-		userIDs = append(userIDs, id)
-	}
-
-	if err := h.chatService.AddParticipants(chatID, userIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// Verify user is in chat
+	inChat, _ := h.chatService.IsUserInChat(c.Request.Context(), chatID, userID)
+	if !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Participants added successfully"})
+	if err := h.chatService.AddParticipants(c.Request.Context(), chatID, req.UserIDs); err != nil {
+		h.logger.Error("failed to add participants", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to add participants"},
+		})
+		return
+	}
+
+	chat, _ := h.chatService.GetChatByID(c.Request.Context(), chatID)
+	c.JSON(http.StatusOK, chat)
 }
 
-// RemoveParticipant godoc
-// @Summary      참여자 제거
-// @Description  채팅방에서 참여자를 제거합니다
-// @Tags         chat
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Param        userId path string true "User ID" example:"550e8400-e29b-41d4-a716-446655440001"
-// @Success      200 {object} map[string]string "message: Participant removed successfully"
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /chats/{chatId}/participants/{userId} [delete]
-// @Security     BearerAuth
+// RemoveParticipant removes a participant from a chat
 func (h *ChatHandler) RemoveParticipant(c *gin.Context) {
+	currentUserID := c.MustGet("user_id").(uuid.UUID)
+
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
 	userID, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid user ID"},
+		})
 		return
 	}
 
-	if err := h.chatService.RemoveParticipant(chatID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	// Verify current user is in chat
+	inChat, _ := h.chatService.IsUserInChat(c.Request.Context(), chatID, currentUserID)
+	if !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Participant removed successfully"})
-}
-
-// DeleteChat godoc
-// @Summary      채팅방 삭제
-// @Description  채팅방을 삭제합니다 (Soft Delete)
-// @Tags         chat
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {object} map[string]string "message: Chat deleted successfully"
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /chats/{chatId} [delete]
-// @Security     BearerAuth
-func (h *ChatHandler) DeleteChat(c *gin.Context) {
-	chatID, err := uuid.Parse(c.Param("chatId"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+	if err := h.chatService.RemoveParticipant(c.Request.Context(), chatID, userID); err != nil {
+		h.logger.Error("failed to remove participant", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to remove participant"},
+		})
 		return
 	}
 
-	if err := h.chatService.DeleteChat(chatID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Chat deleted successfully"})
+	c.Status(http.StatusNoContent)
 }

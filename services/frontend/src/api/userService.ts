@@ -172,15 +172,15 @@ export const rejectMember = async (workspaceId: string, userId: string): Promise
 };
 
 /**
- * 워크스페이스에 사용자 초대 (userId 기준)
+ * 워크스페이스에 사용자 초대 (이메일 기준)
  * [API] POST /api/workspaces/{workspaceId}/members/invite
  * * Response: { data: WorkspaceMemberResponse }
  */
 export const inviteUser = async (
   workspaceId: string,
-  query: string,
+  email: string,
 ): Promise<WorkspaceMemberResponse> => {
-  const data: InviteUserRequest = { query };
+  const data: InviteUserRequest = { email };
 
   const response: AxiosResponse<{ data: WorkspaceMemberResponse }> = await userRepoClient.post(
     `/api/workspaces/${workspaceId}/members/invite`,
@@ -252,13 +252,18 @@ export const createJoinRequest = async (workspaceId: string): Promise<JoinReques
 // ========================================
 
 /**
- * 내 프로필 조회 (기본 프로필)
+ * 내 프로필 조회 (워크스페이스별 프로필)
  * [API] GET /api/profiles/me
+ * @param workspaceId - 워크스페이스 ID (X-Workspace-Id 헤더로 전송)
  * * Response: { data: UserProfileResponse }
  */
-export const getMyProfile = async (): Promise<UserProfileResponse> => {
-  const response: AxiosResponse<UserProfileResponse> = await userRepoClient.get('/api/profiles/me');
-  return response.data; // data 필드 추출
+export const getMyProfile = async (workspaceId: string): Promise<UserProfileResponse> => {
+  const response: AxiosResponse<UserProfileResponse> = await userRepoClient.get('/api/profiles/me', {
+    headers: {
+      'X-Workspace-Id': workspaceId,
+    },
+  });
+  return response.data;
 };
 
 /**
@@ -337,6 +342,7 @@ export const saveProfileAttachmentMetadata = async (
  * 💡 [추가/수정] 프로필 이미지 업데이트 (Attachment ID 기반)
  * [API] PUT /api/profiles/me/image
  * * DTO: { workspaceId, attachmentId }
+ * * Header: X-Workspace-Id required
  */
 export const updateProfileImage = async (
   workspaceId: string,
@@ -346,10 +352,14 @@ export const updateProfileImage = async (
     workspaceId,
     attachmentId,
   };
-  console.log(data);
   const response: AxiosResponse<UserProfileResponse> = await userRepoClient.put(
     '/api/profiles/me/image',
     data,
+    {
+      headers: {
+        'X-Workspace-Id': workspaceId,
+      },
+    },
   );
   return response.data;
 };
@@ -377,13 +387,19 @@ export const uploadProfileImage = async (
     const { uploadUrl, fileKey } = await generateProfilePresignedUrl(presignedData);
 
     // 2. S3에 파일 업로드
-    await fetch(uploadUrl, {
+    const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       headers: {
         'Content-Type': file.type,
       },
       body: file,
     });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('S3 업로드 실패:', uploadResponse.status, errorText);
+      throw new Error(`S3 업로드 실패: ${uploadResponse.status}`);
+    }
 
     // 3. 첨부파일 메타데이터 저장 및 Attachment ID 반환
     const attachmentData: SaveAttachmentRequest = {

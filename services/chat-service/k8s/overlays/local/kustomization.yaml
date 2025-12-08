@@ -1,14 +1,25 @@
-# chat-service - Local overlay
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: wealist-dev
 
 resources:
   - ../../base
 
-namespace: wealist-local
+images:
+  - name: chat-service
+    newName: chat-service
+    newTag: local
+
+replicas:
+  - name: chat-service
+    count: 1
 
 patches:
-  - path: patches/deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: chat-service
+  - target:
+      kind: ConfigMap
+      name: chat-service-config
+    patch: |-
+      - op: replace
+        path: /data/GIN_MODE
+        value: "debug"

@@ -1,162 +1,187 @@
-// internal/service/chat_service.go
 package service
 
 import (
-	"chat-service/internal/model"
+	"chat-service/internal/domain"
 	"chat-service/internal/repository"
+	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 )
 
-// ChatWithUnread - 읽지 않은 메시지 수를 포함한 채팅방 응답
-type ChatWithUnread struct {
-	model.Chat
-	UnreadCount int64 `json:"unreadCount"`
+type ChatService struct {
+	chatRepo    *repository.ChatRepository
+	messageRepo *repository.MessageRepository
+	redis       *redis.Client
+	logger      *zap.Logger
 }
 
-type ChatService interface {
-	CreateChat(workspaceID uuid.UUID, projectID *uuid.UUID, chatType model.ChatType, chatName string, createdBy uuid.UUID, participantIDs []uuid.UUID) (*model.Chat, error)
-	GetChat(chatID uuid.UUID) (*model.Chat, error)
-	GetWorkspaceChats(workspaceID uuid.UUID) ([]model.Chat, error)
-	GetUserChats(userID uuid.UUID) ([]model.Chat, error)
-	GetUserChatsWithUnread(userID uuid.UUID) ([]ChatWithUnread, error) // 🔥 unreadCount 포함
-	UpdateChat(chatID uuid.UUID, chatName string) error
-	DeleteChat(chatID uuid.UUID) error
-
-	AddParticipants(chatID uuid.UUID, userIDs []uuid.UUID) error
-	RemoveParticipant(chatID, userID uuid.UUID) error
-	GetParticipants(chatID uuid.UUID) ([]model.ChatParticipant, error)
-	IsParticipant(chatID, userID uuid.UUID) (bool, error)
-	UpdateLastRead(chatID, userID uuid.UUID) error
-}
-
-type chatService struct {
-	chatRepo    repository.ChatRepository
-	messageRepo repository.MessageRepository // 🔥 추가
-}
-
-func NewChatService(chatRepo repository.ChatRepository, messageRepo repository.MessageRepository) ChatService {
-	return &chatService{
+func NewChatService(
+	chatRepo *repository.ChatRepository,
+	messageRepo *repository.MessageRepository,
+	redis *redis.Client,
+	logger *zap.Logger,
+) *ChatService {
+	return &ChatService{
 		chatRepo:    chatRepo,
 		messageRepo: messageRepo,
+		redis:       redis,
+		logger:      logger,
 	}
 }
 
-func (s *chatService) CreateChat(
-	workspaceID uuid.UUID,
-	projectID *uuid.UUID,
-	chatType model.ChatType,
-	chatName string,
-	createdBy uuid.UUID,
-	participantIDs []uuid.UUID,
-) (*model.Chat, error) {
-	// 채팅방 생성
-	chat := &model.Chat{
-		WorkspaceID: workspaceID,
-		ProjectID:   projectID,
-		ChatType:    chatType,
-		ChatName:    chatName,
+func (s *ChatService) CreateChat(ctx context.Context, req *domain.CreateChatRequest, createdBy uuid.UUID) (*domain.Chat, error) {
+	chat := &domain.Chat{
+		ID:          uuid.New(),
+		WorkspaceID: req.WorkspaceID,
+		ProjectID:   req.ProjectID,
+		ChatType:    req.ChatType,
+		ChatName:    req.ChatName,
 		CreatedBy:   createdBy,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
-	if err := s.chatRepo.CreateChat(chat); err != nil {
-		return nil, fmt.Errorf("failed to create chat: %w", err)
-	}
-
-	// 생성자를 참여자로 추가
-	participantIDs = append([]uuid.UUID{createdBy}, participantIDs...)
-
-	// 참여자 추가
-	for _, userID := range participantIDs {
-		participant := &model.ChatParticipant{
-			ChatID:   chat.ChatID,
-			UserID:   userID,
-			IsActive: true, // 🔥 명시적으로 true 설정 (Go bool 기본값은 false)
-		}
-		if err := s.chatRepo.AddParticipant(participant); err != nil {
-			return nil, fmt.Errorf("failed to add participant: %w", err)
-		}
-	}
-
-	return chat, nil
-}
-
-func (s *chatService) GetChat(chatID uuid.UUID) (*model.Chat, error) {
-	return s.chatRepo.GetChatByID(chatID)
-}
-
-func (s *chatService) GetWorkspaceChats(workspaceID uuid.UUID) ([]model.Chat, error) {
-	return s.chatRepo.GetChatsByWorkspace(workspaceID)
-}
-
-func (s *chatService) GetUserChats(userID uuid.UUID) ([]model.Chat, error) {
-	return s.chatRepo.GetChatsByUser(userID)
-}
-
-// 🔥 GetUserChatsWithUnread - 읽지 않은 메시지 수를 포함하여 반환
-func (s *chatService) GetUserChatsWithUnread(userID uuid.UUID) ([]ChatWithUnread, error) {
-	chats, err := s.chatRepo.GetChatsByUser(userID)
-	if err != nil {
+	if err := s.chatRepo.Create(chat); err != nil {
 		return nil, err
 	}
 
-	result := make([]ChatWithUnread, len(chats))
-	for i, chat := range chats {
-		unreadCount, err := s.messageRepo.GetUnreadCount(chat.ChatID, userID)
-		if err != nil {
-			// 에러 시 0으로 설정하고 계속 진행
-			unreadCount = 0
-		}
-		result[i] = ChatWithUnread{
-			Chat:        chat,
-			UnreadCount: unreadCount,
-		}
+	// Ensure creator is in participants
+	participantIDs := append([]uuid.UUID{createdBy}, req.Participants...)
+	uniqueIDs := make(map[uuid.UUID]bool)
+	for _, id := range participantIDs {
+		uniqueIDs[id] = true
 	}
 
-	return result, nil
-}
-
-func (s *chatService) UpdateChat(chatID uuid.UUID, chatName string) error {
-	chat, err := s.chatRepo.GetChatByID(chatID)
-	if err != nil {
-		return err
+	var uniqueParticipants []uuid.UUID
+	for id := range uniqueIDs {
+		uniqueParticipants = append(uniqueParticipants, id)
 	}
 
-	chat.ChatName = chatName
-	return s.chatRepo.UpdateChat(chat)
-}
-
-func (s *chatService) DeleteChat(chatID uuid.UUID) error {
-	return s.chatRepo.DeleteChat(chatID)
-}
-
-func (s *chatService) AddParticipants(chatID uuid.UUID, userIDs []uuid.UUID) error {
-	for _, userID := range userIDs {
-		participant := &model.ChatParticipant{
-			ChatID:   chatID,
-			UserID:   userID,
-			IsActive: true, // 🔥 명시적으로 true 설정
-		}
-		if err := s.chatRepo.AddParticipant(participant); err != nil {
-			return err
-		}
+	if err := s.chatRepo.AddParticipants(chat.ID, uniqueParticipants); err != nil {
+		return nil, err
 	}
-	return nil
+
+	// Reload with participants
+	return s.chatRepo.GetByID(chat.ID)
 }
 
-func (s *chatService) RemoveParticipant(chatID, userID uuid.UUID) error {
+func (s *ChatService) GetChatByID(ctx context.Context, chatID uuid.UUID) (*domain.Chat, error) {
+	return s.chatRepo.GetByID(chatID)
+}
+
+func (s *ChatService) GetUserChats(ctx context.Context, userID uuid.UUID) ([]domain.ChatWithUnread, error) {
+	return s.chatRepo.GetUserChats(userID)
+}
+
+func (s *ChatService) GetWorkspaceChats(ctx context.Context, workspaceID uuid.UUID) ([]domain.Chat, error) {
+	return s.chatRepo.GetWorkspaceChats(workspaceID)
+}
+
+func (s *ChatService) DeleteChat(ctx context.Context, chatID uuid.UUID) error {
+	return s.chatRepo.SoftDelete(chatID)
+}
+
+func (s *ChatService) AddParticipants(ctx context.Context, chatID uuid.UUID, userIDs []uuid.UUID) error {
+	return s.chatRepo.AddParticipants(chatID, userIDs)
+}
+
+func (s *ChatService) RemoveParticipant(ctx context.Context, chatID, userID uuid.UUID) error {
 	return s.chatRepo.RemoveParticipant(chatID, userID)
 }
 
-func (s *chatService) GetParticipants(chatID uuid.UUID) ([]model.ChatParticipant, error) {
-	return s.chatRepo.GetParticipants(chatID)
+func (s *ChatService) IsUserInChat(ctx context.Context, chatID, userID uuid.UUID) (bool, error) {
+	return s.chatRepo.IsUserInChat(chatID, userID)
 }
 
-func (s *chatService) IsParticipant(chatID, userID uuid.UUID) (bool, error) {
-	return s.chatRepo.IsParticipant(chatID, userID)
+func (s *ChatService) SendMessage(ctx context.Context, chatID, userID uuid.UUID, req *domain.SendMessageRequest) (*domain.Message, error) {
+	messageType := domain.MessageTypeText
+	if req.MessageType != "" {
+		messageType = req.MessageType
+	}
+
+	message := &domain.Message{
+		ID:          uuid.New(),
+		ChatID:      chatID,
+		UserID:      userID,
+		Content:     req.Content,
+		MessageType: messageType,
+		FileURL:     req.FileURL,
+		FileName:    req.FileName,
+		FileSize:    req.FileSize,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	if err := s.messageRepo.Create(message); err != nil {
+		return nil, err
+	}
+
+	// Update chat timestamp
+	s.chatRepo.UpdateTimestamp(chatID)
+
+	// Publish to Redis for WebSocket broadcast
+	s.publishMessage(ctx, chatID, message)
+
+	return message, nil
 }
 
-func (s *chatService) UpdateLastRead(chatID, userID uuid.UUID) error {
-	return s.chatRepo.UpdateLastRead(chatID, userID)
+func (s *ChatService) GetMessages(ctx context.Context, chatID uuid.UUID, limit int, before *uuid.UUID) ([]domain.Message, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	return s.messageRepo.GetByChatID(chatID, limit, before)
+}
+
+func (s *ChatService) DeleteMessage(ctx context.Context, messageID uuid.UUID) error {
+	return s.messageRepo.SoftDelete(messageID)
+}
+
+func (s *ChatService) MarkMessagesAsRead(ctx context.Context, messageIDs []uuid.UUID, userID uuid.UUID) error {
+	return s.messageRepo.MarkMultipleAsRead(messageIDs, userID)
+}
+
+func (s *ChatService) UpdateLastReadAt(ctx context.Context, chatID, userID uuid.UUID) error {
+	return s.chatRepo.UpdateLastReadAt(chatID, userID)
+}
+
+func (s *ChatService) GetUnreadCount(ctx context.Context, chatID, userID uuid.UUID) (int64, error) {
+	chat, err := s.chatRepo.GetByID(chatID)
+	if err != nil {
+		return 0, err
+	}
+
+	var lastReadAt *time.Time
+	for _, p := range chat.Participants {
+		if p.UserID == userID {
+			lastReadAt = p.LastReadAt
+			break
+		}
+	}
+
+	return s.messageRepo.GetUnreadCount(chatID, userID, lastReadAt)
+}
+
+func (s *ChatService) publishMessage(ctx context.Context, chatID uuid.UUID, message *domain.Message) {
+	if s.redis == nil {
+		return
+	}
+
+	channel := fmt.Sprintf("chat:%s", chatID.String())
+	data, err := json.Marshal(map[string]interface{}{
+		"type":    "MESSAGE_RECEIVED",
+		"message": message,
+	})
+	if err != nil {
+		s.logger.Error("failed to marshal message for publish", zap.Error(err))
+		return
+	}
+
+	if err := s.redis.Publish(ctx, channel, data).Err(); err != nil {
+		s.logger.Error("failed to publish message", zap.Error(err))
+	}
 }

@@ -76,8 +76,8 @@ export interface CreateChatRequest {
   workspaceId: string;
   projectId?: string;
   chatType: ChatType;
-  chatName?: string;
-  participantIds?: string[];
+  chatName: string;
+  participants: string[];
 }
 
 /**

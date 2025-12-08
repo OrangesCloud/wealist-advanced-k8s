@@ -1,59 +1,67 @@
-// internal/handler/presence_handler.go (새로 생성)
 package handler
 
 import (
+	"chat-service/internal/service"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type PresenceHandler struct {
-	wsHandler *WSHandler
+	presenceService *service.PresenceService
+	logger          *zap.Logger
 }
 
-func NewPresenceHandler(wsHandler *WSHandler) *PresenceHandler {
+func NewPresenceHandler(presenceService *service.PresenceService, logger *zap.Logger) *PresenceHandler {
 	return &PresenceHandler{
-		wsHandler: wsHandler,
+		presenceService: presenceService,
+		logger:          logger,
 	}
 }
 
-// GetOnlineUsers godoc
-// @Summary      온라인 사용자 목록
-// @Description  현재 온라인인 사용자 목록을 가져옵니다
-// @Tags         presence
-// @Produce      json
-// @Success      200 {object} map[string][]string
-// @Router       /presence/online [get]
-// @Security     BearerAuth
+// GetOnlineUsers returns online users
 func (h *PresenceHandler) GetOnlineUsers(c *gin.Context) {
-	users := h.wsHandler.hub.GetOnlineUsers()
-	c.JSON(http.StatusOK, gin.H{
-		"onlineUsers": users,
-		"count":       len(users),
-	})
-}
+	var workspaceID *uuid.UUID
+	if wsIDStr := c.Query("workspaceId"); wsIDStr != "" {
+		if wsID, err := uuid.Parse(wsIDStr); err == nil {
+			workspaceID = &wsID
+		}
+	}
 
-// CheckUserStatus godoc
-// @Summary      사용자 온라인 여부 확인
-// @Description  특정 사용자가 온라인인지 확인합니다
-// @Tags         presence
-// @Produce      json
-// @Param        userId path string true "User ID"
-// @Success      200 {object} map[string]bool
-// @Router       /presence/status/{userId} [get]
-// @Security     BearerAuth
-func (h *PresenceHandler) CheckUserStatus(c *gin.Context) {
-	userIDStr := c.Param("userId")
-	userID, err := uuid.Parse(userIDStr)
+	presences, err := h.presenceService.GetOnlineUsers(c.Request.Context(), workspaceID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		h.logger.Error("failed to get online users", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to get online users"},
+		})
 		return
 	}
 
-	isOnline := h.wsHandler.hub.IsUserOnline(userID)
-	c.JSON(http.StatusOK, gin.H{
-		"userId":   userIDStr,
-		"isOnline": isOnline,
-	})
+	c.JSON(http.StatusOK, presences)
+}
+
+// GetUserStatus returns a user's online status
+func (h *PresenceHandler) GetUserStatus(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid user ID"},
+		})
+		return
+	}
+
+	presence, err := h.presenceService.GetUserStatus(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "NOT_FOUND", "message": "User presence not found"},
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, presence)
 }

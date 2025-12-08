@@ -3,8 +3,8 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	// swaggerFiles "github.com/swaggo/files"
+	// ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
@@ -22,6 +22,7 @@ type Config struct {
 	Logger             *zap.Logger
 	JWTSecret          string
 	UserClient         client.UserClient
+	NotificationClient client.NotificationClient
 	BasePath           string
 	UserServiceBaseURL string
 	Metrics            *metrics.Metrics
@@ -60,9 +61,9 @@ func Setup(cfg Config) *gin.Engine {
 
 	// Initialize services with repository dependencies
 	projectService := service.NewProjectService(projectRepo, fieldOptionRepo, attachmentRepo, cfg.S3Client, cfg.UserClient, cfg.Metrics, cfg.Logger)
-	boardService := service.NewBoardService(boardRepo, projectRepo, fieldOptionRepo, participantRepo, attachmentRepo, cfg.S3Client, fieldOptionConverter, cfg.Metrics, cfg.Logger)
+	boardService := service.NewBoardService(boardRepo, projectRepo, fieldOptionRepo, participantRepo, attachmentRepo, cfg.S3Client, fieldOptionConverter, cfg.NotificationClient, cfg.Metrics, cfg.Logger)
 	participantService := service.NewParticipantService(participantRepo, boardRepo)
-	commentService := service.NewCommentService(commentRepo, boardRepo, attachmentRepo, cfg.S3Client, cfg.Logger)
+	commentService := service.NewCommentService(commentRepo, boardRepo, projectRepo, attachmentRepo, cfg.S3Client, cfg.NotificationClient, cfg.Logger)
 	fieldOptionService := service.NewFieldOptionService(fieldOptionRepo)
 	projectMemberService := service.NewProjectMemberService(projectRepo, cfg.UserClient)
 	projectJoinRequestService := service.NewProjectJoinRequestService(projectRepo, cfg.UserClient)
@@ -96,8 +97,8 @@ func Setup(cfg Config) *gin.Engine {
 	// /ready - readiness probe: DB 연결 상태까지 체크
 	baseGroup.GET("/ready", readinessHandler(cfg.DB))
 
-	// Swagger documentation endpoint
-	baseGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger documentation endpoint (disabled for faster builds)
+	// baseGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Metrics endpoint (no authentication required)
 	// Add metrics endpoint at root level for compatibility

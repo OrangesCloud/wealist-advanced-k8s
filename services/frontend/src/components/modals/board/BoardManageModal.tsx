@@ -223,7 +223,7 @@ export const BoardManageModal: React.FC<BoardManageModalProps> = ({
 
       if (selectedFile) {
         const uploadedAttachment = await uploadAttachment(selectedFile, 'BOARD', workspaceId);
-        attachmentIdsPayload = [uploadedAttachment.id];
+        attachmentIdsPayload = [uploadedAttachment.attachmentId];
       } else if (
         editData?.boardId &&
         !existingAttachment &&
@@ -460,9 +460,9 @@ export const BoardManageModal: React.FC<BoardManageModalProps> = ({
                         {currentAssignee ? (
                           <>
                             <div className="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">
-                              {currentAssignee.userName[0]}
+                              {currentAssignee.nickName?.[0] || currentAssignee.userEmail?.[0] || '?'}
                             </div>
-                            {currentAssignee.userName}
+                            {currentAssignee.nickName || currentAssignee.userEmail || 'Unknown'}
                           </>
                         ) : (
                           <span className="text-gray-400">선택 안함</span>
@@ -495,9 +495,9 @@ export const BoardManageModal: React.FC<BoardManageModalProps> = ({
                             }`}
                           >
                             <div className="w-5 h-5 rounded-full bg-gray-300 text-white flex items-center justify-center text-xs font-bold">
-                              {m.userName[0]}
+                              {m.nickName?.[0] || m.userEmail?.[0] || '?'}
                             </div>
-                            {m.userName}
+                            {m.nickName || m.userEmail || 'Unknown'}
                           </button>
                         ))}
                       </div>
@@ -522,6 +522,7 @@ export const BoardManageModal: React.FC<BoardManageModalProps> = ({
                               members={workspaceMembers.filter((m) =>
                                 selectedParticipantIds.includes(m.userId),
                               )}
+                              interactive={false}
                             />
                             <span>{selectedParticipantIds.length}명</span>
                           </>
@@ -549,9 +550,9 @@ export const BoardManageModal: React.FC<BoardManageModalProps> = ({
                           >
                             <div className="flex items-center gap-2">
                               <div className="w-5 h-5 rounded-full bg-gray-300 text-white flex items-center justify-center text-xs font-bold">
-                                {m.userName[0]}
+                                {m.nickName?.[0] || m.userEmail?.[0] || '?'}
                               </div>
-                              {m.userName}
+                              {m.nickName || m.userEmail || 'Unknown'}
                             </div>
                             {selectedParticipantIds.includes(m.userId) && (
                               <CheckSquareIcon className="w-4 h-4 text-blue-500" />

@@ -1,9 +1,14 @@
-# user-service ConfigMap
-# TODO: Add environment-specific configurations
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: user-service-config
 data:
+  SPRING_PROFILES_ACTIVE: "default"
   SERVER_PORT: "8080"
-  # TODO: Add more config values
+  # Database
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/user_db"
+  # Redis
+  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_DATA_REDIS_PORT: "6379"
+  # Service URLs
+  AUTH_SERVICE_URL: "http://auth-service:8081"

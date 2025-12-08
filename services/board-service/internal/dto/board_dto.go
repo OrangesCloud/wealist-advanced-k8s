@@ -52,7 +52,7 @@ type UpdateBoardFieldRequest struct {
 // @Description File attachment metadata for boards and projects
 // @Description Contains information about uploaded files including S3 URL, size, and content type
 type AttachmentResponse struct {
-	ID          uuid.UUID `json:"id" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
+	ID          uuid.UUID `json:"attachmentId" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
 	FileName    string    `json:"fileName" example:"document.pdf"`
 	FileURL     string    `json:"fileUrl" example:"https://s3.amazonaws.com/bucket/file.pdf"`
 	FileSize    int64     `json:"fileSize" example:"1024000"`

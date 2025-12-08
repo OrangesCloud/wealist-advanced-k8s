@@ -60,7 +60,15 @@ COMMAND=${1:-up}
 case $COMMAND in
     up)
         echo -e "${BLUE}🚀 개발 환경을 백그라운드로 시작합니다...${NC}"
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d --build
+
+        # Swagger 문서 생성 스킵 (빌드 속도 개선)
+        # echo -e "${BLUE}📝 Swagger 문서 확인 중...${NC}"
+        # ./docker/scripts/generate-swagger.sh all 2>/dev/null || echo -e "${YELLOW}⚠️  Swagger 생성 스킵 (swag 미설치 - Docker에서 생성됨)${NC}"
+
+        echo -e "${BLUE}🔨 이미지 빌드 중...${NC}"
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES build
+        echo -e "${BLUE}🚀 컨테이너 시작 중...${NC}"
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d
         echo -e "${GREEN}✅ 개발 환경이 시작되었습니다.${NC}"
         echo -e "${BLUE}📊 서비스 접속 정보:${NC}"
         echo "   - Frontend:    http://localhost:3000"
@@ -76,7 +84,6 @@ case $COMMAND in
         echo "   - Chat API swagger:    http://localhost:8001/swagger/index.html"
         echo -e ""
         echo -e "${BLUE}💡 로그 확인: ./docker/scripts/dev.sh logs${NC}"
-        docker ps -a
         ;;
 
     up-fg)
@@ -113,7 +120,8 @@ case $COMMAND in
 
     rebuild)
         echo -e "${BLUE}🔨 이미지를 다시 빌드하고 시작합니다...${NC}"
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d --build
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES build
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d
         echo -e "${GREEN}✅ 빌드 및 시작이 완료되었습니다.${NC}"
         ;;
 
@@ -139,6 +147,13 @@ case $COMMAND in
         docker compose $ENV_FILE_OPTION $COMPOSE_FILES exec "$SERVICE" "$SHELL"
         ;;
 
+    swagger)
+        SERVICE=${2:-all}
+        FORCE_FLAG=${3:-}
+        echo -e "${BLUE}📝 Swagger 문서를 생성합니다...${NC}"
+        ./docker/scripts/generate-swagger.sh "$SERVICE" "$FORCE_FLAG"
+        ;;
+
     *)
         echo -e "${RED}❌ 알 수 없는 명령어: $COMMAND${NC}"
         echo ""
@@ -153,6 +168,7 @@ case $COMMAND in
         echo "  clean      - 모두 삭제 (볼륨 포함)"
         echo "  ps         - 실행 중인 서비스 확인"
         echo "  exec       - 컨테이너 접속 (exec [service] [shell])"
+        echo "  swagger    - Swagger 문서 생성 (swagger [service] [--force])"
         exit 1
         ;;
 esac

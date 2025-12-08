@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	"project-board-api/internal/client"
 	"project-board-api/internal/domain"
 	"project-board-api/internal/dto"
 	"project-board-api/internal/repository"
@@ -24,28 +25,32 @@ type CommentService interface {
 
 // commentServiceImpl is the implementation of CommentService
 type commentServiceImpl struct {
-	commentRepo    repository.CommentRepository
-	boardRepo      repository.BoardRepository
-	attachmentRepo repository.AttachmentRepository
-	s3Client       S3Client
-	logger         *zap.Logger
+	commentRepo        repository.CommentRepository
+	boardRepo          repository.BoardRepository
+	projectRepo        repository.ProjectRepository
+	attachmentRepo     repository.AttachmentRepository
+	s3Client           S3Client
+	notificationClient client.NotificationClient
+	logger             *zap.Logger
 }
 
 // NewCommentService creates a new instance of CommentService
-func NewCommentService(commentRepo repository.CommentRepository, boardRepo repository.BoardRepository, attachmentRepo repository.AttachmentRepository, s3Client S3Client, logger *zap.Logger) CommentService {
+func NewCommentService(commentRepo repository.CommentRepository, boardRepo repository.BoardRepository, projectRepo repository.ProjectRepository, attachmentRepo repository.AttachmentRepository, s3Client S3Client, notificationClient client.NotificationClient, logger *zap.Logger) CommentService {
 	return &commentServiceImpl{
-		commentRepo:    commentRepo,
-		boardRepo:      boardRepo,
-		attachmentRepo: attachmentRepo,
-		s3Client:       s3Client,
-		logger:         logger,
+		commentRepo:        commentRepo,
+		boardRepo:          boardRepo,
+		projectRepo:        projectRepo,
+		attachmentRepo:     attachmentRepo,
+		s3Client:           s3Client,
+		notificationClient: notificationClient,
+		logger:             logger,
 	}
 }
 
 // CreateComment creates a new comment on a board
 func (s *commentServiceImpl) CreateComment(ctx context.Context, userID uuid.UUID, req *dto.CreateCommentRequest) (*dto.CommentResponse, error) {
-	// Verify board exists
-	_, err := s.boardRepo.FindByID(ctx, req.BoardID)
+	// Verify board exists and get board info for notifications
+	board, err := s.boardRepo.FindByID(ctx, req.BoardID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, response.NewAppError(response.ErrCodeNotFound, "Board not found", "")
@@ -111,6 +116,15 @@ func (s *commentServiceImpl) CreateComment(ctx context.Context, userID uuid.UUID
 
 	// 생성된 Attachments를 Comment 객체에 할당 (타입 변환 적용)
 	comment.Attachments = toDomainAttachments(createdAttachments)
+
+	// Send notification to board author (if different from commenter)
+	if board.AuthorID != userID {
+		s.sendCommentAddedNotification(ctx, userID, board.AuthorID, board.ProjectID, board.ID, board.Title, req.Content)
+	}
+	// Also notify assignee if different from both commenter and author
+	if board.AssigneeID != nil && *board.AssigneeID != userID && *board.AssigneeID != board.AuthorID {
+		s.sendCommentAddedNotification(ctx, userID, *board.AssigneeID, board.ProjectID, board.ID, board.Title, req.Content)
+	}
 
 	// Convert to response DTO
 	return s.toCommentResponse(comment), nil
@@ -343,4 +357,49 @@ func (s *commentServiceImpl) deleteAttachmentsWithS3(ctx context.Context, attach
 				zap.Error(err))
 		}
 	}
+}
+
+// sendCommentAddedNotification sends a notification when a comment is added to a board
+func (s *commentServiceImpl) sendCommentAddedNotification(ctx context.Context, actorID, targetUserID, projectID, boardID uuid.UUID, boardTitle, commentContent string) {
+	if s.notificationClient == nil {
+		return
+	}
+
+	// Get workspace ID from project
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		s.logger.Warn("Failed to get project for comment notification",
+			zap.String("project_id", projectID.String()),
+			zap.Error(err))
+		return
+	}
+
+	// Truncate comment content for notification preview (max 100 chars)
+	preview := commentContent
+	if len(preview) > 100 {
+		preview = preview[:97] + "..."
+	}
+
+	event := client.NotificationEvent{
+		Type:         client.NotificationCommentAdded,
+		ActorID:      actorID,
+		TargetUserID: targetUserID,
+		WorkspaceID:  project.WorkspaceID,
+		ResourceType: "task",
+		ResourceID:   boardID,
+		ResourceName: boardTitle,
+		Metadata: map[string]interface{}{
+			"projectId":      projectID.String(),
+			"projectName":    project.Name,
+			"commentPreview": preview,
+		},
+	}
+
+	go func() {
+		if err := s.notificationClient.SendNotification(context.Background(), event); err != nil {
+			s.logger.Warn("Failed to send comment added notification",
+				zap.String("target_user_id", targetUserID.String()),
+				zap.Error(err))
+		}
+	}()
 }

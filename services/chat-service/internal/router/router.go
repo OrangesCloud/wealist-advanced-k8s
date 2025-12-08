@@ -1,129 +1,96 @@
-// internal/router/router.go
 package router
 
 import (
-	"chat-service/internal/client"
+	"chat-service/internal/config"
 	"chat-service/internal/handler"
 	"chat-service/internal/middleware"
+	"chat-service/internal/repository"
+	"chat-service/internal/service"
+	"chat-service/internal/websocket"
 
 	"github.com/gin-gonic/gin"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/redis/go-redis/v9"
+	// swaggerFiles "github.com/swaggo/files"
+	// ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-func SetupRouter(
-	logger *zap.Logger,
-	userClient client.UserClient,
-	chatHandler *handler.ChatHandler,
-	messageHandler *handler.MessageHandler,
-	wsHandler *handler.WSHandler,
-	corsOrigins string,
-	db *gorm.DB,
-) *gin.Engine {
-	router := gin.New()
+func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *zap.Logger) *gin.Engine {
+	if cfg.Server.Env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
-	// Global Middleware
-	router.Use(middleware.Logger(logger))
-	router.Use(middleware.Recovery(logger))
-	router.Use(middleware.CORS(corsOrigins))
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.LoggerMiddleware(logger))
+	r.Use(middleware.CORSMiddleware("*"))
 
-	// Health Check endpoints (Kubernetes probe 호환)
-	// /health - liveness probe: 서비스 자체가 살아있는지만 체크 (DB 연결 무관)
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "healthy", "service": "chat-service"})
-	})
-	// /api/chats/health - liveness probe (Docker health check용)
-	router.GET("/api/chats/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "healthy", "service": "chat-service"})
-	})
-	// /ready - readiness probe: DB 연결 상태까지 체크
-	router.GET("/ready", readinessHandler(db))
-	// /api/chats/ready - readiness probe (base path 버전)
-	router.GET("/api/chats/ready", readinessHandler(db))
+	// Initialize repositories
+	chatRepo := repository.NewChatRepository(db)
+	messageRepo := repository.NewMessageRepository(db)
+	presenceRepo := repository.NewPresenceRepository(db)
 
-	// Swagger UI
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Initialize services
+	chatService := service.NewChatService(chatRepo, messageRepo, redisClient, logger)
+	presenceService := service.NewPresenceService(presenceRepo, redisClient, logger)
 
-	// Auth Middleware
-	authMiddleware := middleware.NewAuthMiddleware(userClient, logger)
+	// Initialize validator
+	validator := middleware.NewAuthServiceValidator(cfg.Auth.ServiceURL, cfg.Auth.SecretKey, logger)
 
-	// 🔥 Presence Handler (router 내부에서 생성)
-	presenceHandler := handler.NewPresenceHandler(wsHandler)
+	// Initialize WebSocket hub
+	wsHub := websocket.NewHub(chatService, presenceService, validator, redisClient, logger)
 
-	// 🔥 WebSocket - auth middleware 밖에 위치 (자체 토큰 검증 사용)
-	router.GET("/api/chats/ws/:chatId", wsHandler.HandleWebSocket)
+	// Initialize handlers
+	chatHandler := handler.NewChatHandler(chatService, presenceService, logger)
+	messageHandler := handler.NewMessageHandler(chatService, logger)
+	presenceHandler := handler.NewPresenceHandler(presenceService, logger)
+	healthHandler := handler.NewHealthHandler(db, redisClient)
 
-	// 🔥 Global Presence WebSocket - 앱 접속 시 온라인 상태 등록
-	router.GET("/api/chats/ws/presence", wsHandler.HandlePresenceWebSocket)
+	// Health endpoints (no auth)
+	r.GET("/health", healthHandler.Health)
+	r.GET("/ready", healthHandler.Ready)
 
-	// API Routes (인증 필요)
-	api := router.Group("/api/chats")
-	api.Use(authMiddleware.RequireAuth())
+	// Swagger documentation (disabled for faster builds)
+	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// API routes with base path
+	api := r.Group(cfg.Server.BasePath)
 	{
-		// Chat Routes
-		api.POST("", chatHandler.CreateChat)
-		api.GET("/my", chatHandler.GetMyChats)
-		api.GET("/workspace/:workspaceId", chatHandler.GetWorkspaceChats)
-		api.GET("/:chatId", chatHandler.GetChat)
-		api.DELETE("/:chatId", chatHandler.DeleteChat)
-		api.POST("/:chatId/participants", chatHandler.AddParticipants)
-		api.DELETE("/:chatId/participants/:userId", chatHandler.RemoveParticipant)
+		// Health under base path
+		api.GET("/health", healthHandler.Health)
+		api.GET("/ready", healthHandler.Ready)
 
-		// Message Routes
-		api.GET("/messages/:chatId", messageHandler.GetMessages)
-		api.POST("/messages/:chatId", messageHandler.SendMessage)
-		api.DELETE("/messages/:messageId", messageHandler.DeleteMessage)
-		api.POST("/messages/read", messageHandler.MarkMessagesAsRead)
-		api.GET("/messages/:chatId/unread", messageHandler.GetUnreadCount)
-		api.PUT("/messages/:chatId/last-read", messageHandler.UpdateLastRead)
+		// WebSocket endpoints (static route must come before dynamic route)
+		api.GET("/ws/presence", wsHub.HandlePresenceWebSocket)
+		api.GET("/ws/:chatId", wsHub.HandleChatWebSocket)
 
-		// 🔥 Presence Routes
-		api.GET("/presence/online", presenceHandler.GetOnlineUsers)
-		api.GET("/presence/status/:userId", presenceHandler.CheckUserStatus)
+		// Authenticated routes
+		authenticated := api.Group("")
+		authenticated.Use(middleware.AuthMiddleware(validator))
+		{
+			// Chat routes
+			authenticated.POST("", chatHandler.CreateChat)
+			authenticated.GET("/my", chatHandler.GetMyChats)
+			authenticated.GET("/workspace/:workspaceId", chatHandler.GetWorkspaceChats)
+			authenticated.GET("/:chatId", chatHandler.GetChat)
+			authenticated.DELETE("/:chatId", chatHandler.DeleteChat)
+			authenticated.POST("/:chatId/participants", chatHandler.AddParticipants)
+			authenticated.DELETE("/:chatId/participants/:userId", chatHandler.RemoveParticipant)
+
+			// Message routes
+			authenticated.GET("/messages/:chatId", messageHandler.GetMessages)
+			authenticated.POST("/messages/:chatId", messageHandler.SendMessage)
+			authenticated.DELETE("/messages/:messageId", messageHandler.DeleteMessage)
+			authenticated.POST("/messages/read", messageHandler.MarkMessagesAsRead)
+			authenticated.GET("/messages/:chatId/unread", messageHandler.GetUnreadCount)
+			authenticated.PUT("/messages/:chatId/last-read", messageHandler.UpdateLastRead)
+
+			// Presence routes
+			authenticated.GET("/presence/online", presenceHandler.GetOnlineUsers)
+			authenticated.GET("/presence/status/:userId", presenceHandler.GetUserStatus)
+		}
 	}
 
-	return router
-}
-
-// readinessHandler returns a handler for readiness probe
-// DB 연결 상태까지 체크하여 트래픽 수신 가능 여부 판단
-func readinessHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// DB가 nil이면 아직 연결 안 됨
-		if db == nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
-				"database": "not_initialized",
-				"error":    "database connection not established yet",
-			})
-			return
-		}
-
-		// Check database connection
-		sqlDB, err := db.DB()
-		if err != nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
-				"database": "error",
-				"error":    err.Error(),
-			})
-			return
-		}
-
-		if err := sqlDB.Ping(); err != nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
-				"database": "disconnected",
-				"error":    err.Error(),
-			})
-			return
-		}
-
-		c.JSON(200, gin.H{
-			"status":   "ready",
-			"database": "connected",
-		})
-	}
+	return r
 }

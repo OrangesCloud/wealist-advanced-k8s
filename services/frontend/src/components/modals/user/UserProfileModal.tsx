@@ -1,33 +1,30 @@
-// src/components/modals/board/ProjectManageModal.tsx
+// src/components/modals/user/UserProfileModal.tsx
 
 /**
- * 사용자 프로필 모달 컴포넌트
+ * 사용자 프로필 모달 컴포넌트 (단순화)
  *
- * [최종 로직 목표]
- * 1. 초기 로드 시: GET /api/workspaces/all (워크스페이스 목록) + GET /api/profiles/all/me (모든 프로필)을 호출.
- * 2. 탭 선택 시: 로컬 상태(allProfiles)에서 기본 프로필(workspaceId=null)과 선택된 워크스페이스 프로필을 필터링하여 표시.
- * 3. 저장 시:
- * a. 이미지 업로드: S3에 업로드하고 Attachment 메타데이터를 저장(TEMP 상태).
- * b. 최종 프로필 업데이트: 닉네임 변경 요청 + **Attachment ID**를 사용해 최종 프로필 이미지 URL을 연결.
+ * - 기본 프로필: useAuth().nickName을 기본값으로 사용
+ * - 워크스페이스 프로필: 해당 워크스페이스의 프로필이 없으면 기본 프로필(default)을 fallback으로 사용
  */
 
-import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
+import React, { useState, useRef, ChangeEvent, useEffect, useMemo } from 'react';
 import { X, Camera } from 'lucide-react';
 import { useTheme } from '../../../contexts/ThemeContext';
 import {
   updateMyProfile,
   getAllMyProfiles,
   getMyWorkspaces,
-  uploadProfileImage, // S3 업로드 및 Attachment 저장 (TEMP)까지 처리하고 AttachmentResponse를 반환
-  updateProfileImage, // Attachment ID를 사용해 최종 프로필을 업데이트하는 함수
+  uploadProfileImage,
+  updateProfileImage,
 } from '../../../api/userService';
 import {
   UserProfileResponse,
   UpdateProfileRequest,
   UserWorkspaceResponse,
-  AttachmentResponse, // AttachmentResponse 타입 사용
+  AttachmentResponse,
 } from '../../../types/user';
 import Portal from '../../common/Portal';
+import { useAuth } from '../../../contexts/AuthContext';
 
 const DEFAULT_WORKSPACE_ID = '00000000-0000-0000-0000-000000000000';
 
@@ -37,38 +34,44 @@ interface UserProfileModalProps {
 
 const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
   const { theme } = useTheme();
-  const [activeTab, setActiveTab] = useState<'default' | 'workspace'>('default');
+  const { nickName: authNickName, refreshNickName } = useAuth();
 
+  const [activeTab, setActiveTab] = useState<'default' | 'workspace'>('default');
   const [allProfiles, setAllProfiles] = useState<UserProfileResponse[]>([]);
   const [workspaces, setWorkspaces] = useState<UserWorkspaceResponse[]>([]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [defaultNickName, setDefaultNickName] = useState('');
-  const [workspaceNickName, setWorkspaceNickName] = useState('');
-
+  // 단일 닉네임 상태 (useAuth의 닉네임을 기본값으로)
+  const [nickName, setNickName] = useState(authNickName || '');
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
-
-  // S3에 업로드할 실제 파일 객체 상태
-  const [_selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // ========================================
-  // 프로필 데이터 필터링 및 계산된 상태
+  // 프로필 데이터 계산 (useMemo)
   // ========================================
 
-  const defaultProfile = allProfiles?.find((p) => p.workspaceId === DEFAULT_WORKSPACE_ID) || null;
-  const currentWorkspaceProfile =
-    allProfiles?.find((p) => p.workspaceId === selectedWorkspaceId) || null;
+  const defaultProfile = useMemo(
+    () => allProfiles.find((p) => p.workspaceId === DEFAULT_WORKSPACE_ID) || null,
+    [allProfiles]
+  );
 
-  const currentProfile =
-    activeTab === 'default' ? defaultProfile : currentWorkspaceProfile || defaultProfile;
+  const workspaceProfile = useMemo(
+    () => allProfiles.find((p) => p.workspaceId === selectedWorkspaceId) || null,
+    [allProfiles, selectedWorkspaceId]
+  );
 
-  const currentNickName = activeTab === 'default' ? defaultNickName : workspaceNickName;
-  const setCurrentNickName = activeTab === 'default' ? setDefaultNickName : setWorkspaceNickName;
+  // 현재 프로필: 워크스페이스 탭인데 해당 프로필이 없으면 기본 프로필 fallback
+  const currentProfile = useMemo(
+    () => (activeTab === 'default' ? defaultProfile : workspaceProfile || defaultProfile),
+    [activeTab, defaultProfile, workspaceProfile]
+  );
+
+  const userId = currentProfile?.userId || allProfiles[0]?.userId;
 
   // ========================================
   // 초기 데이터 로드
@@ -78,23 +81,22 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
     const loadInitialData = async () => {
       try {
         setLoading(true);
-        const [allProfs, workspaceList] = await Promise.all([
+        const [profiles, workspaceList] = await Promise.all([
           getAllMyProfiles(),
           getMyWorkspaces(),
         ]);
 
-        setAllProfiles(allProfs);
-
-        // 1. 기본 프로필 닉네임 초기화
-        const initialDefaultProfile = allProfs?.find((p) => p.workspaceId === DEFAULT_WORKSPACE_ID);
-        if (initialDefaultProfile) {
-          setDefaultNickName(initialDefaultProfile?.nickName);
-        }
-
-        // 2. 워크스페이스 목록 초기화
+        setAllProfiles(profiles);
         setWorkspaces(workspaceList);
+
         if (workspaceList.length > 0) {
           setSelectedWorkspaceId(workspaceList[0].workspaceId);
+        }
+
+        // 기본 프로필 닉네임으로 초기화 (없으면 useAuth 닉네임 유지)
+        const defaultProf = profiles.find((p) => p.workspaceId === DEFAULT_WORKSPACE_ID);
+        if (defaultProf?.nickName) {
+          setNickName(defaultProf.nickName);
         }
       } catch (err) {
         console.error('[Initial Data Load Error]', err);
@@ -106,29 +108,21 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
     loadInitialData();
   }, []);
 
-  // 워크스페이스/탭 변경 시 닉네임/아바타 상태 동기화
+  // 탭/워크스페이스 변경 시 닉네임 & 아바타 동기화
   useEffect(() => {
-    const profileToSync = currentProfile;
+    // 워크스페이스 프로필이 있으면 해당 닉네임, 없으면 기본 프로필 닉네임, 그것도 없으면 useAuth 닉네임
+    const profileNickName =
+      activeTab === 'workspace' && workspaceProfile?.nickName
+        ? workspaceProfile.nickName
+        : defaultProfile?.nickName || authNickName || '';
 
-    // 1. 닉네임 동기화
-    if (activeTab === 'default') {
-      setDefaultNickName(profileToSync?.nickName || '');
-    } else if (activeTab === 'workspace') {
-      setWorkspaceNickName(currentWorkspaceProfile?.nickName || defaultProfile?.nickName || '');
-    }
+    setNickName(profileNickName);
 
-    // 2. 아바타 미리보기 동기화
-    if (!_selectedFile) {
-      setAvatarPreviewUrl(profileToSync?.profileImageUrl || null);
+    // 아바타 미리보기 동기화 (새 파일 선택 안 했을 때만)
+    if (!selectedFile) {
+      setAvatarPreviewUrl(currentProfile?.profileImageUrl || null);
     }
-  }, [
-    selectedWorkspaceId,
-    activeTab,
-    defaultProfile,
-    currentWorkspaceProfile,
-    currentProfile,
-    _selectedFile,
-  ]);
+  }, [activeTab, selectedWorkspaceId, workspaceProfile, defaultProfile, authNickName, currentProfile, selectedFile]);
 
   // ========================================
   // 이미지 업로드 핸들러
@@ -146,112 +140,84 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
       }
       setAvatarPreviewUrl(URL.createObjectURL(file));
       setSelectedFile(file);
-      console.log(`[File] 새 프로필 사진 선택: ${file.name}`);
     } else {
       setSelectedFile(null);
       setAvatarPreviewUrl(currentProfile?.profileImageUrl || null);
     }
   };
 
-  // 💡 [복구된 함수] 워크스페이스 변경 핸들러
-  const handleWorkspaceChange = (workspaceId: string) => {
-    setSelectedWorkspaceId(workspaceId);
-  };
-
   // ========================================
-  // 저장 핸들러 (S3 업로드 및 Attachment ID 사용)
+  // 저장 핸들러
   // ========================================
 
   const handleSave = async () => {
+    const trimmedNickName = nickName.trim();
+
+    if (!trimmedNickName) {
+      setError('닉네임은 필수입니다.');
+      return;
+    }
+
+    if (!userId) {
+      setError('프로필을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const targetWorkspaceId = activeTab === 'default' ? DEFAULT_WORKSPACE_ID : selectedWorkspaceId;
+    let updatedProfile: UserProfileResponse | undefined;
+
     try {
-      setLoading(true);
-      setError(null);
-
-      const trimmedNickName = currentNickName?.trim();
-
-      if (!trimmedNickName) {
-        setError('닉네임은 필수입니다.');
-        setLoading(false);
-        return;
+      // 1. 이미지 업로드 (새 파일 선택 시)
+      if (selectedFile) {
+        const attachmentResponse: AttachmentResponse = await uploadProfileImage(
+          selectedFile,
+          targetWorkspaceId
+        );
+        updatedProfile = await updateProfileImage(targetWorkspaceId, attachmentResponse.attachmentId);
       }
 
-      const currentUserId = currentProfile?.userId;
-      if (!currentUserId) {
-        throw new Error('사용자 ID를 찾을 수 없습니다. (재로그인 필요)');
-      }
-
-      const targetWorkspaceId =
-        activeTab === 'default' ? DEFAULT_WORKSPACE_ID : selectedWorkspaceId;
-      let updatedProfile: UserProfileResponse | undefined = undefined;
-
-      // 1. 이미지 업로드 처리 (새 파일이 선택된 경우)
-      if (_selectedFile) {
-        try {
-          // uploadProfileImage는 AttachmentResponse를 반환합니다.
-          const attachmentResponse: AttachmentResponse = await uploadProfileImage(
-            _selectedFile,
-            targetWorkspaceId,
-          );
-          // 💡 [Attachment ID 획득] 저장된 Attachment의 ID를 추출하여 최종 업데이트에 사용
-          const attachmentId = attachmentResponse.attachmentId;
-
-          // 2. Attachment ID를 사용하여 프로필 이미지 최종 연결 (PUT /api/profiles/me/image 호출)
-          // * 이 호출이 attachmentId를 payload로 전달합니다.
-          const finalProfileUpdate = await updateProfileImage(targetWorkspaceId, attachmentId);
-          console.log(finalProfileUpdate);
-          // updatedProfile을 최종 결과로 설정 (이 응답에는 최신 프로필 정보가 포함됨)
-          updatedProfile = finalProfileUpdate;
-        } catch (err) {
-          console.error('[Image Upload/Link Error]', err);
-          throw new Error('프로필 이미지 업데이트에 실패했습니다.');
-        }
-      }
-
-      // 3. 닉네임 업데이트
-      // 닉네임만 바뀌었거나, 이미지 업데이트는 했지만 닉네임은 업데이트 응답에 포함되지 않았을 경우 (또는 닉네임이 다를 경우)
+      // 2. 닉네임 업데이트 (변경 시 또는 이미지만 업로드한 경우)
       const isNickNameChanged = updatedProfile
         ? updatedProfile.nickName !== trimmedNickName
         : currentProfile?.nickName !== trimmedNickName;
 
       if (isNickNameChanged || !updatedProfile) {
-        // updatedProfile이 null인 경우 (이미지 업데이트를 안 한 경우) 또는 닉네임 변경이 필요한 경우
         const updateData: UpdateProfileRequest = {
           nickName: trimmedNickName,
           workspaceId: targetWorkspaceId,
-          userId: currentUserId,
+          userId: userId,
         };
-        // 닉네임 업데이트 결과로 updatedProfile을 갱신합니다.
         updatedProfile = await updateMyProfile(updateData);
       }
 
-      // 4. updatedProfile이 최종적으로 설정되었는지 확인
       if (!updatedProfile) throw new Error('API 응답이 유효하지 않습니다.');
 
-      // 5. 로컬 상태 업데이트 (allProfiles)
+      // 3. 로컬 상태 업데이트
       setAllProfiles((prev) => {
-        const index = prev?.findIndex((p) => p.workspaceId === targetWorkspaceId);
+        const index = prev.findIndex((p) => p.workspaceId === targetWorkspaceId);
+        const newProfile: UserProfileResponse = { ...updatedProfile!, workspaceId: targetWorkspaceId };
 
-        const profileToUpdate: UserProfileResponse = {
-          ...updatedProfile!,
-          workspaceId: targetWorkspaceId,
-        };
-
-        if (index !== -1 && prev) {
-          const newProfiles = [...prev];
-          newProfiles[index] = profileToUpdate;
-          return newProfiles;
+        if (index !== -1) {
+          const updated = [...prev];
+          updated[index] = newProfile;
+          return updated;
         }
-        return [...(prev || []), profileToUpdate];
+        return [...prev, newProfile];
       });
 
-      // 6. 저장 후 파일 상태 초기화
-      setSelectedFile(null);
+      // 4. 기본 프로필 저장 시 AuthContext 닉네임도 갱신
+      if (activeTab === 'default') {
+        refreshNickName();
+      }
 
-      alert('✅ 프로필이 저장되었습니다!');
+      setSelectedFile(null);
+      alert('프로필이 저장되었습니다!');
     } catch (err: any) {
       const errorMsg = err.response?.data?.error?.message || err.message;
       console.error('[Profile Save Error]', errorMsg);
-      // 💡 오류 메시지 상세화 (BAD_REQUEST의 경우 백엔드 오류 코드를 그대로 보여줄 수 있음)
       setError(errorMsg || '프로필 저장에 실패했습니다.');
     } finally {
       setLoading(false);
@@ -263,7 +229,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
   // ========================================
 
   const handleClose = () => {
-    if (avatarPreviewUrl && _selectedFile) {
+    if (avatarPreviewUrl && selectedFile) {
       URL.revokeObjectURL(avatarPreviewUrl);
     }
     onClose();
@@ -350,7 +316,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
                 </label>
                 <select
                   value={selectedWorkspaceId}
-                  onChange={(e) => handleWorkspaceChange(e.target.value)}
+                  onChange={(e) => setSelectedWorkspaceId(e.target.value)}
                   className={`w-full px-3 py-2 ${theme.effects.cardBorderWidth} ${theme.colors.border} ${theme.colors.card} ${theme.font.size.xs} ${theme.effects.borderRadius} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   disabled={workspaces.length === 0}
                 >
@@ -372,13 +338,13 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
                 <div className="relative">
                   {avatarPreviewUrl ? (
                     <img
-                      src={_selectedFile ? avatarPreviewUrl : currentProfile?.profileImageUrl || ''}
+                      src={selectedFile ? avatarPreviewUrl : currentProfile?.profileImageUrl || ''}
                       alt="프로필 미리보기"
                       className="w-24 h-24 object-cover border-2 border-gray-300 rounded-full"
                     />
                   ) : (
                     <div className="w-24 h-24 bg-blue-500 border-2 border-gray-300 flex items-center justify-center text-white text-3xl font-bold rounded-full">
-                      {currentNickName[0] || 'U'}
+                      {nickName[0] || 'U'}
                     </div>
                   )}
 
@@ -407,8 +373,8 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
                 </label>
                 <input
                   type="text"
-                  value={currentNickName}
-                  onChange={(e) => setCurrentNickName(e.target.value)}
+                  value={nickName}
+                  onChange={(e) => setNickName(e.target.value)}
                   className={`w-full px-3 py-2 ${theme.effects.cardBorderWidth} ${theme.colors.border} ${theme.colors.card} ${theme.font.size.xs} ${theme.effects.borderRadius} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   placeholder="닉네임을 입력하세요"
                 />
@@ -418,11 +384,11 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ onClose }) => {
               <div className="flex gap-2 pt-4">
                 <button
                   onClick={handleSave}
-                  disabled={loading}
+                  disabled={loading || !userId || !nickName.trim()}
                   className={`flex-1 ${theme.colors.primary} text-white py-3 ${
                     theme.effects.borderRadius
                   } font-semibold transition ${
-                    loading ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
+                    loading || !userId || !nickName.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'
                   }`}
                 >
                   {loading ? '저장 중...' : '저장'}

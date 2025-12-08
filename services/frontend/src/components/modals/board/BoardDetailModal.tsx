@@ -445,7 +445,7 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
                 {assigneeMember ? (
                   <div className="flex items-center gap-2">
                     <AvatarStack members={[assigneeMember]} />
-                    <span className="text-sm">{assigneeMember.userName}</span>
+                    <span className="text-sm">{assigneeMember.nickName || assigneeMember.userEmail || 'Unknown'}</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">할당되지 않음</span>
@@ -463,7 +463,7 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
                     <span className="text-sm text-gray-700">
                       {participantMembers
                         .slice(0, 3)
-                        .map((m) => m.userName)
+                        .map((m) => m.nickName || m.userEmail || 'Unknown')
                         .join(', ')}{' '}
                       {participantMembers.length > 3 && (
                         <span className="text-gray-500"> 외 {participantMembers.length - 3}명</span>

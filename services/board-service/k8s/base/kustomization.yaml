@@ -1,4 +1,3 @@
-# board-service Kustomize base
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -6,6 +5,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
+  - secret.yaml
 
 commonLabels:
   app.kubernetes.io/name: board-service

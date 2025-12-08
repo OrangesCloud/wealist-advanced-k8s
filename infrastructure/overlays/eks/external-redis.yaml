@@ -1,5 +1,4 @@
-# External Redis Service (AWS ElastiCache)
-# ExternalName service to connect to ElastiCache
+# ExternalName service pointing to ElastiCache
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,23 +7,6 @@ metadata:
     app: redis
 spec:
   type: ExternalName
-  externalName: YOUR_ELASTICACHE_ENDPOINT.cache.amazonaws.com  # TODO: Update with actual ElastiCache endpoint
----
-# TODO: Use External Secrets Operator with Vault
-# Example ExternalSecret CRD
-# apiVersion: external-secrets.io/v1beta1
-# kind: ExternalSecret
-# metadata:
-#   name: redis-secret
-# spec:
-#   refreshInterval: 1h
-#   secretStoreRef:
-#     name: vault-backend
-#     kind: ClusterSecretStore
-#   target:
-#     name: redis-secret
-#   data:
-#     - secretKey: REDIS_PASSWORD
-#       remoteRef:
-#         key: secret/data/wealist/redis
-#         property: password
+  externalName: ${ELASTICACHE_ENDPOINT}
+  ports:
+    - port: 6379

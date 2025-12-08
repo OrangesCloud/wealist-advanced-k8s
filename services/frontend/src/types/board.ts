@@ -29,7 +29,7 @@ export interface ErrorResponse {
  * [API: GET /api/boards/{boardId}/attachments 등]
  */
 export interface AttachmentResponse {
-  id: string; // Swagger: id (기존 attachmentId 대체)
+  attachmentId: string; // 첨부파일 ID (format: uuid)
   entityId?: string; // 연관된 엔티티 ID (Board, Project, Comment)
   entityType?: string; // BOARD, PROJECT, COMMENT
   fileName: string; // 원본 파일명
@@ -452,7 +452,7 @@ export interface UpdateCommentRequest {
  * [API: GET /api/participants/board/{boardId}]
  */
 export interface ParticipantResponse {
-  id: string; // Participant ID
+  participantId: string; // Participant ID (format: uuid)
   boardId: string;
   userId: string;
   createdAt: string;

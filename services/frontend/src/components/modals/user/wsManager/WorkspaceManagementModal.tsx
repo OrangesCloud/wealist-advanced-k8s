@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useTheme } from '../../../../contexts/ThemeContext';
 import { useAuth } from '../../../../contexts/AuthContext';
@@ -12,7 +13,7 @@ import { WorkspaceSettingsTab } from './tabs/WorkspaceSettingsTab'; // 💡 분�
 import { WorkspaceMembersTab } from './tabs/WorkspaceMembersTab'; // 💡 분리된 컴포넌트
 
 // 💡 API 함수 Import
-import { getWorkspaceSettings, updateWorkspaceSettings } from '../../../../api/userService';
+import { getWorkspaceSettings, updateWorkspaceSettings, deleteWorkspace } from '../../../../api/userService';
 
 import { WorkspaceSettingsResponse, UpdateWorkspaceSettingsRequest } from '../../../../types/user';
 
@@ -28,6 +29,7 @@ const WorkspaceManagementModal: React.FC<WorkspaceManagementModalProps> = ({
 }) => {
   const { theme } = useTheme();
   const { token } = useAuth(); // 인증 상태 확인용
+  const navigate = useNavigate();
 
   // ========================================
   // 상태 관리
@@ -104,6 +106,34 @@ const WorkspaceManagementModal: React.FC<WorkspaceManagementModalProps> = ({
       console.error('[WorkspaceManagement] 설정 저장 실패:', err);
       const errorMsg = err.response?.data?.error?.message || err.message;
       setError(`설정 저장에 실패했습니다: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========================================
+  // 워크스페이스 삭제 핸들러
+  // ========================================
+
+  const handleDeleteWorkspace = async () => {
+    const workspaceName = settings?.workspaceName || '워크스페이스';
+    const confirmed = window.confirm(
+      `정말로 "${workspaceName}" 워크스페이스를 삭제하시겠습니까?\n\n삭제된 워크스페이스는 복구할 수 없으며, 모든 프로젝트와 데이터가 함께 삭제됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      await deleteWorkspace(workspaceId);
+      alert('워크스페이스가 삭제되었습니다.');
+      onClose();
+      navigate('/workspaces'); // 워크스페이스 선택 페이지로 이동
+    } catch (err: any) {
+      console.error('[WorkspaceManagement] 워크스페이스 삭제 실패:', err);
+      const errorMsg = err.response?.data?.error?.message || err.message;
+      setError(`워크스페이스 삭제에 실패했습니다: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -207,6 +237,7 @@ const WorkspaceManagementModal: React.FC<WorkspaceManagementModalProps> = ({
                 settingsForm={settingsForm}
                 setSettingsForm={setSettingsForm}
                 handleSaveSettings={handleSaveSettings}
+                handleDeleteWorkspace={handleDeleteWorkspace}
                 loading={loading}
                 error={error}
               />

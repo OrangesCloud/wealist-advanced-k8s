@@ -65,8 +65,8 @@ export interface WorkspaceResponse {
   workspaceName: string;
   workspaceDescription: string;
   ownerId: string;
-  ownerName: string;
-  ownerEmail: string;
+  ownerNickName: string; // 오너 닉네임
+  ownerEmail: string; // 오너 이메일
   isPublic: boolean; // OpenAPI 명세에 추가된 필드
   needApproved: boolean; // OpenAPI 명세에 추가된 필드 (requiresApproval과 동일 목적)
   createdAt: string;
@@ -124,16 +124,17 @@ export type WorkspaceMemberRole = 'OWNER' | 'ADMIN' | 'MEMBER';
  * @description 워크스페이스 멤버 목록 조회 및 역할 변경 응답
  */
 export interface WorkspaceMemberResponse {
-  id: string; // WorkspaceMember ID (format: uuid)
+  workspaceMemberId: string; // WorkspaceMember ID (format: uuid)
   workspaceId: string;
   userId: string;
   profileImageUrl?: string;
-  userName: string;
-  userEmail: string;
+  nickName: string; // 멤버 닉네임
+  userEmail: string; // 멤버 이메일
   roleName: WorkspaceMemberRole;
   isDefault: boolean;
+  isActive: boolean;
   joinedAt: string;
-  role: string;
+  updatedAt: string;
 }
 
 /**
@@ -150,11 +151,12 @@ export interface UpdateMemberRoleRequest {
  * @description 승인 대기 목록 조회 응답 (이전 PendingMember 대체)
  */
 export interface JoinRequestResponse {
-  id: string; // JoinRequest ID (format: uuid)
+  joinRequestId: string; // JoinRequest ID (format: uuid)
   workspaceId: string;
   userId: string;
-  userName: string;
-  userEmail: string;
+  nickName: string; // 신청자 닉네임
+  userEmail: string; // 신청자 이메일
+  workspaceName?: string; // 워크스페이스 이름
   status: string; // e.g., "PENDING"
   requestedAt: string;
   updatedAt: string;
@@ -173,7 +175,8 @@ export interface CreateJoinRequestRequest {
  * [API: POST /api/workspaces/{workspaceId}/members/invite]
  */
 export interface InviteUserRequest {
-  query: string;
+  email: string;
+  roleName?: WorkspaceMemberRole;
 }
 
 /**
@@ -231,7 +234,7 @@ export interface AttachmentResponse {
   fileSize: number;
   contentType: string;
   uploadedBy: string; // format: uuid
-  uploadedAt: string; // format: date-time
+  createdAt: string; // format: date-time
   expiresAt: string | null; // format: date-time
 }
 

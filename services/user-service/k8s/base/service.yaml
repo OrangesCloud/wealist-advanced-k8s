@@ -1,4 +1,3 @@
-# user-service Service
 apiVersion: v1
 kind: Service
 metadata:

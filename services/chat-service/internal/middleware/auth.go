@@ -1,113 +1,152 @@
-// internal/middleware/auth.go
 package middleware
 
 import (
-	"chat-service/internal/client"
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-type AuthMiddleware struct {
-	userClient client.UserClient
-	logger     *zap.Logger
+type TokenValidator interface {
+	ValidateToken(ctx context.Context, token string) (uuid.UUID, error)
 }
 
-func NewAuthMiddleware(userClient client.UserClient, logger *zap.Logger) *AuthMiddleware {
-	return &AuthMiddleware{
-		userClient: userClient,
-		logger:     logger,
+type AuthServiceValidator struct {
+	authServiceURL string
+	secretKey      string
+	httpClient     *http.Client
+	logger         *zap.Logger
+}
+
+func NewAuthServiceValidator(authServiceURL, secretKey string, logger *zap.Logger) *AuthServiceValidator {
+	return &AuthServiceValidator{
+		authServiceURL: authServiceURL,
+		secretKey:      secretKey,
+		httpClient: &http.Client{
+			Timeout: 5 * time.Second,
+		},
+		logger: logger,
 	}
 }
 
-// RequireAuth는 JWT 토큰 검증 미들웨어입니다
-func (m *AuthMiddleware) RequireAuth() gin.HandlerFunc {
+func (v *AuthServiceValidator) ValidateToken(ctx context.Context, tokenString string) (uuid.UUID, error) {
+	// Try auth service first
+	if v.authServiceURL != "" {
+		userID, err := v.validateWithAuthService(ctx, tokenString)
+		if err == nil {
+			return userID, nil
+		}
+		v.logger.Debug("Auth service validation failed, falling back to local", zap.Error(err))
+	}
+
+	// Fallback to local JWT validation
+	return v.validateLocally(tokenString)
+}
+
+func (v *AuthServiceValidator) validateWithAuthService(ctx context.Context, token string) (uuid.UUID, error) {
+	url := v.authServiceURL + "/api/auth/validate"
+
+	reqBody, _ := json.Marshal(map[string]string{"token": token})
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := v.httpClient.Do(req)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return uuid.Nil, jwt.ErrTokenInvalidClaims
+	}
+
+	var result struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return uuid.Nil, err
+	}
+
+	return uuid.Parse(result.UserID)
+}
+
+func (v *AuthServiceValidator) validateLocally(tokenString string) (uuid.UUID, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(v.secretKey), nil
+	})
+
+	if err != nil || !token.Valid {
+		return uuid.Nil, jwt.ErrTokenInvalidClaims
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return uuid.Nil, jwt.ErrTokenInvalidClaims
+	}
+
+	var userIDStr string
+	for _, key := range []string{"sub", "userId", "user_id"} {
+		if val, exists := claims[key]; exists {
+			userIDStr = val.(string)
+			break
+		}
+	}
+
+	if userIDStr == "" {
+		return uuid.Nil, jwt.ErrTokenInvalidClaims
+	}
+
+	return uuid.Parse(userIDStr)
+}
+
+// AuthMiddleware validates JWT token from Authorization header
+func AuthMiddleware(validator TokenValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. Authorization 헤더에서 토큰 추출
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			m.logger.Warn("Missing Authorization header",
-				zap.String("path", c.Request.URL.Path))
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Authorization header required",
+				"success": false,
+				"error":   gin.H{"code": "UNAUTHORIZED", "message": "No authorization header"},
 			})
 			c.Abort()
 			return
 		}
 
-		// 2. Bearer 토큰 파싱
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			m.logger.Warn("Invalid Authorization header format")
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid Authorization header format. Expected: Bearer <token>",
+				"success": false,
+				"error":   gin.H{"code": "UNAUTHORIZED", "message": "Invalid authorization header format"},
 			})
 			c.Abort()
 			return
 		}
 
-		token := parts[1]
-
-		// 3. User Service에서 토큰 검증
-		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
-		defer cancel()
-
-		validationResp, err := m.userClient.ValidateToken(ctx, token)
+		tokenString := parts[1]
+		userID, err := validator.ValidateToken(c.Request.Context(), tokenString)
 		if err != nil {
-			m.logger.Error("Token validation failed",
-				zap.Error(err),
-				zap.String("path", c.Request.URL.Path))
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Token validation failed",
+				"success": false,
+				"error":   gin.H{"code": "UNAUTHORIZED", "message": "Invalid token"},
 			})
 			c.Abort()
 			return
 		}
 
-		if !validationResp.Valid {
-			m.logger.Warn("Invalid token",
-				zap.String("message", validationResp.Message),
-				zap.String("path", c.Request.URL.Path))
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "Invalid token",
-				"message": validationResp.Message,
-			})
-			c.Abort()
-			return
-		}
-
-		// 4. Context에 userID 저장
-		c.Set("userID", validationResp.UserID)
-		c.Set("token", token)
-
-		m.logger.Debug("Token validated successfully",
-			zap.String("userId", validationResp.UserID),
-			zap.String("path", c.Request.URL.Path))
-
+		c.Set("user_id", userID)
+		c.Set("token", tokenString)
 		c.Next()
 	}
-}
-
-// GetUserID는 Context에서 userID를 가져옵니다
-func GetUserID(c *gin.Context) (string, bool) {
-	userID, exists := c.Get("userID")
-	if !exists {
-		return "", false
-	}
-	userIDStr, ok := userID.(string)
-	return userIDStr, ok
-}
-
-// GetToken은 Context에서 token을 가져옵니다
-func GetToken(c *gin.Context) (string, bool) {
-	token, exists := c.Get("token")
-	if !exists {
-		return "", false
-	}
-	tokenStr, ok := token.(string)
-	return tokenStr, ok
 }

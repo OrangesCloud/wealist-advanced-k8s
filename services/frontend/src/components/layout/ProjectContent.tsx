@@ -71,6 +71,15 @@ export const ProjectContent: React.FC<ProjectContentProps> = ({
   // 💡 [UI States]
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null);
 
+  // 알림에서 클릭한 보드 열기
+  useEffect(() => {
+    const pendingBoardId = localStorage.getItem('pendingBoardId');
+    if (pendingBoardId) {
+      setSelectedBoardId(pendingBoardId);
+      localStorage.removeItem('pendingBoardId');
+    }
+  }, [selectedProject]);
+
   // Drag state
   const [draggedBoard, setDraggedBoard] = useState<BoardResponse | null>(null);
   const [draggedFromColumn, setDraggedFromColumn] = useState<string | null>(null);

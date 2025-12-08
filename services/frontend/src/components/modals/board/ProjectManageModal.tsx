@@ -10,9 +10,10 @@ import {
   Lock,
   Loader2,
   User as UserIcon,
+  Trash2,
 } from 'lucide-react';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { createProject, updateProject, getBoardsByProject } from '../../../api/boardService';
+import { createProject, updateProject, getBoardsByProject, deleteProject } from '../../../api/boardService';
 import {
   ProjectResponse,
   BoardResponse,
@@ -108,7 +109,7 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
     currentProject?.attachments?.[0],
   );
   const [currentAttachmentId, setCurrentAttachmentId] = useState<string | undefined>(
-    currentProject?.attachments?.[0]?.id,
+    currentProject?.attachments?.[0]?.attachmentId,
   );
 
   // File Upload Hook
@@ -132,9 +133,15 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
     );
   }, [isExistingProject, userRole]);
 
-  // [오류 해결] members prop이 변경될 때 projectMembers 상태를 갱신합니다. (무한 루프 방지)
+  // [오류 해결] members prop이 변경될 때 projectMembers 상태를 갱신합니다.
+  // 참고: 배열 내용 비교로 불필요한 업데이트 방지하여 무한 루프 방지
   useEffect(() => {
-    if (members !== projectMembers) {
+    // 배열 내용이 동일하면 업데이트하지 않음
+    const isSame =
+      projectMembers.length === members.length &&
+      projectMembers.every((m, i) => m.userId === members[i]?.userId);
+
+    if (!isSame) {
       setProjectMembers(members);
     }
   }, [members, projectMembers]);
@@ -152,11 +159,11 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
 
       const initialAttachment = projectToUse.attachments?.[0];
       setFirstAttachmentState(initialAttachment);
-      setCurrentAttachmentId(initialAttachment?.id);
+      setCurrentAttachmentId(initialAttachment?.attachmentId);
 
       if (initialAttachment) {
         setInitialFile(initialAttachment.fileUrl, initialAttachment.fileName);
-        setAttachmentId(initialAttachment.id);
+        setAttachmentId(initialAttachment.attachmentId);
       } else {
         handleRemoveFile();
       }
@@ -262,12 +269,12 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
         // 수정 성공 후, 최신 첨부 파일 정보를 상태에 반영
         const newAttachment = updatedProject.attachments?.[0];
         setFirstAttachmentState(newAttachment);
-        setCurrentAttachmentId(newAttachment?.id);
+        setCurrentAttachmentId(newAttachment?.attachmentId);
 
         // 파일 업로드 훅 상태 갱신
         if (newAttachment) {
           setInitialFile(newAttachment.fileUrl, newAttachment.fileName);
-          setAttachmentId(newAttachment.id);
+          setAttachmentId(newAttachment.attachmentId);
         } else {
           handleRemoveFile();
         }
@@ -295,6 +302,35 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
       const errorMsg = err.response?.data?.error?.message || err.message;
       console.error(mode === 'create' ? '❌ 생성 실패:' : '❌ 수정 실패:', errorMsg);
       setError(errorMsg || '작업 처리에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ========================================
+  // 프로젝트 삭제 핸들러
+  // ========================================
+
+  const handleDeleteProject = async () => {
+    if (!project) return;
+
+    const confirmed = window.confirm(
+      `정말로 "${project.name}" 프로젝트를 삭제하시겠습니까?\n\n삭제된 프로젝트는 복구할 수 없으며, 모든 보드와 데이터가 함께 삭제됩니다.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      await deleteProject(project.projectId);
+      alert('프로젝트가 삭제되었습니다.');
+      onProjectSaved();
+      onClose();
+    } catch (err: any) {
+      console.error('❌ 프로젝트 삭제 실패:', err);
+      const errorMsg = err.response?.data?.error?.message || err.message;
+      setError(`프로젝트 삭제에 실패했습니다: ${errorMsg}`);
     } finally {
       setIsLoading(false);
     }
@@ -511,17 +547,17 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
                   key={member?.userId}
                   className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 transition"
                 >
-                  <span className="text-sm">{member?.userName}</span>
+                  <span className="text-sm">{member?.nickName || member?.userEmail || 'Unknown'}</span>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${
-                      member?.role === 'OWNER'
+                      member?.roleName === 'OWNER'
                         ? 'bg-red-100 text-red-600'
-                        : member.role === 'MEMBER'
+                        : member?.roleName === 'MEMBER'
                         ? 'bg-blue-100 text-blue-600'
                         : 'bg-gray-100 text-gray-500'
                     }`}
                   >
-                    {member?.role}
+                    {member?.roleName}
                   </span>
                 </div>
               ))}
@@ -560,6 +596,31 @@ export const ProjectManageModal: React.FC<ProjectManageModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* 위험 구역 - 프로젝트 삭제 (detail 모드에서만, OWNER/ADMIN만) */}
+      {mode === 'detail' && canEdit && (
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+            <div>
+              <p className="text-sm font-medium text-red-600">프로젝트 삭제</p>
+              <p className="text-xs text-gray-500">
+                모든 보드와 데이터가 함께 삭제됩니다
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleDeleteProject}
+              disabled={isLoading}
+              className={`p-2 rounded-lg text-red-500 hover:bg-red-100 transition ${
+                isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+              title="프로젝트 삭제"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex gap-3 pt-4 px-6 sticky bottom-0 bg-white border-t border-gray-300">

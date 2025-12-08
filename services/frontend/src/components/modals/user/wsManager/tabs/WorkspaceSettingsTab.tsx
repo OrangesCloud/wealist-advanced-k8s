@@ -1,4 +1,5 @@
 import React from 'react';
+import { Trash2 } from 'lucide-react';
 import { WorkspaceSettingsResponse, UpdateWorkspaceSettingsRequest } from '../../../../../types/user';
 import { useTheme } from '../../../../../contexts/ThemeContext';
 
@@ -7,6 +8,7 @@ interface WorkspaceSettingsTabProps {
   settingsForm: UpdateWorkspaceSettingsRequest;
   setSettingsForm: React.Dispatch<React.SetStateAction<UpdateWorkspaceSettingsRequest>>;
   handleSaveSettings: () => Promise<void>;
+  handleDeleteWorkspace: () => Promise<void>;
   loading: boolean;
   error: string | null;
 }
@@ -15,6 +17,7 @@ export const WorkspaceSettingsTab: React.FC<WorkspaceSettingsTabProps> = ({
   settingsForm,
   setSettingsForm,
   handleSaveSettings,
+  handleDeleteWorkspace,
   loading,
 }) => {
   const { theme } = useTheme();
@@ -128,6 +131,28 @@ export const WorkspaceSettingsTab: React.FC<WorkspaceSettingsTabProps> = ({
       >
         {loading ? '저장 중...' : '설정 저장'}
       </button>
+
+      {/* 위험 구역 - 워크스페이스 삭제 */}
+      <div className="mt-6 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+          <div>
+            <p className="text-sm font-medium text-red-600">워크스페이스 삭제</p>
+            <p className="text-xs text-gray-500">
+              모든 프로젝트, 보드, 회원 정보가 함께 삭제됩니다
+            </p>
+          </div>
+          <button
+            onClick={handleDeleteWorkspace}
+            disabled={loading}
+            className={`p-2 rounded-lg text-red-500 hover:bg-red-100 transition ${
+              loading ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+            title="워크스페이스 삭제"
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

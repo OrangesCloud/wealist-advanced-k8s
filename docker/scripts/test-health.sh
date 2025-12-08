@@ -8,7 +8,8 @@
 # 사용법: ./docker/scripts/test-health.sh
 # =============================================================================
 
-set -e
+# NOTE: set -e를 제거함 - health check 실패가 스크립트를 종료시키지 않도록
+# set -e
 
 # 색상 정의
 RED='\033[0;31m'
@@ -16,14 +17,16 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+GRAY='\033[0;90m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
-# 서비스 포트 정의
-USER_SERVICE_PORT=${USER_HOST_PORT:-8080}
-AUTH_SERVICE_PORT=${AUTH_HOST_PORT:-8090}
+# 서비스 포트 정의 (.env.dev 기본값과 일치)
+AUTH_SERVICE_PORT=${AUTH_HOST_PORT:-8080}
+USER_SERVICE_PORT=${USER_HOST_PORT:-8090}
 BOARD_SERVICE_PORT=${BOARD_HOST_PORT:-8000}
 CHAT_SERVICE_PORT=${CHAT_HOST_PORT:-8001}
+NOTI_SERVICE_PORT=${NOTI_HOST_PORT:-8002}
 
 # 헬퍼 함수
 print_header() {
@@ -58,15 +61,16 @@ print_info() {
 check_liveness() {
     local service=$1
     local url=$2
+    local dep=$3
     local response
 
     response=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
 
     if [ "$response" = "200" ]; then
-        echo -e "  ${GREEN}[LIVE]${NC} $service - $url"
+        echo -e "  ${GREEN}[LIVE]${NC} $service ${GRAY}($dep)${NC}"
         return 0
     else
-        echo -e "  ${RED}[DOWN]${NC} $service - $url (HTTP $response)"
+        echo -e "  ${RED}[DOWN]${NC} $service ${GRAY}($dep)${NC} - HTTP $response"
         return 1
     fi
 }
@@ -74,16 +78,16 @@ check_liveness() {
 check_readiness() {
     local service=$1
     local url=$2
+    local dep=$3
     local response
-    local body
 
     response=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
 
     if [ "$response" = "200" ]; then
-        echo -e "  ${GREEN}[READY]${NC} $service - $url"
+        echo -e "  ${GREEN}[READY]${NC} $service ${GRAY}($dep)${NC}"
         return 0
     else
-        echo -e "  ${YELLOW}[NOT READY]${NC} $service - $url (HTTP $response)"
+        echo -e "  ${YELLOW}[NOT READY]${NC} $service ${GRAY}($dep)${NC} - HTTP $response"
         return 1
     fi
 }
@@ -110,11 +114,13 @@ check_services_running() {
 
     local all_running=true
 
-    check_container_status "wealist-user-service" || all_running=false
-    check_container_status "wealist-auth-service" || all_running=false
-    check_container_status "wealist-board-service" || all_running=false
-    check_container_status "wealist-chat-service" || all_running=false
-    check_container_status "wealist-postgres" || all_running=false
+    check_container_status "wealist-auth-service" || { all_running=false; true; }
+    check_container_status "wealist-user-service" || { all_running=false; true; }
+    check_container_status "wealist-board-service" || { all_running=false; true; }
+    check_container_status "wealist-chat-service" || { all_running=false; true; }
+    check_container_status "wealist-noti-service" || { all_running=false; true; }
+    check_container_status "wealist-postgres" || { all_running=false; true; }
+    check_container_status "wealist-redis" || { all_running=false; true; }
 
     echo ""
 
@@ -134,18 +140,20 @@ run_all_health_checks() {
     print_step "$title"
     echo ""
 
-    echo -e "${BOLD}  [Liveness Probes] - 서비스 생존 여부 (DB 무관)${NC}"
-    check_liveness "user-service " "http://localhost:${USER_SERVICE_PORT}/actuator/health/liveness"
-    check_liveness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/liveness"
-    check_liveness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/health"
-    check_liveness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/health"
+    echo -e "${BOLD}  [Liveness Probes] - 서비스 생존 여부 (외부 의존성 무관)${NC}"
+    check_liveness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/liveness" "Redis 무관" || true
+    check_liveness "user-service " "http://localhost:${USER_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "noti-service " "http://localhost:${NOTI_SERVICE_PORT}/health" "PostgreSQL 무관" || true
 
     echo ""
-    echo -e "${BOLD}  [Readiness Probes] - 트래픽 수신 준비 (DB 포함)${NC}"
-    check_readiness "user-service " "http://localhost:${USER_SERVICE_PORT}/actuator/health/readiness"
-    check_readiness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/readiness"
-    check_readiness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/ready"
-    check_readiness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/ready"
+    echo -e "${BOLD}  [Readiness Probes] - 트래픽 수신 준비 (외부 의존성 포함)${NC}"
+    check_readiness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/readiness" "Redis 체크" || true
+    check_readiness "user-service " "http://localhost:${USER_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "noti-service " "http://localhost:${NOTI_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
 
     echo ""
 }
@@ -155,7 +163,7 @@ check_restart_count() {
     print_step "컨테이너 재시작 횟수 확인..."
     echo ""
 
-    for container in wealist-user-service wealist-auth-service wealist-board-service wealist-chat-service; do
+    for container in wealist-auth-service wealist-user-service wealist-board-service wealist-chat-service wealist-noti-service; do
         local count=$(docker inspect --format='{{.RestartCount}}' "$container" 2>/dev/null || echo "N/A")
         echo -e "  $container: ${BOLD}$count${NC} 회 재시작"
     done
@@ -176,6 +184,13 @@ main() {
     echo "  3. DB 중지 후에도 서비스 컨테이너가 재시작되지 않는지"
     echo "  4. DB 복구 후 readiness가 다시 성공하는지"
     echo ""
+    echo -e "${BOLD}서비스별 Readiness 의존성:${NC}"
+    echo -e "  ${CYAN}auth-service${NC}  → Redis (PostgreSQL 사용 안 함)"
+    echo -e "  ${CYAN}user-service${NC}  → PostgreSQL"
+    echo -e "  ${CYAN}board-service${NC} → PostgreSQL"
+    echo -e "  ${CYAN}chat-service${NC}  → PostgreSQL"
+    echo -e "  ${CYAN}noti-service${NC}  → PostgreSQL"
+    echo ""
 
     # Step 1: 서비스 실행 확인
     print_header "📋 Step 1: 서비스 실행 상태 확인"
@@ -193,6 +208,7 @@ main() {
     # Step 4: DB 중지
     print_header "📋 Step 4: PostgreSQL 데이터베이스 중지"
     print_warning "DB를 중지합니다. 서비스들이 DB 연결을 잃게 됩니다..."
+    echo -e "${GRAY}  (auth-service는 Redis만 사용하므로 영향 없음)${NC}"
     echo ""
 
     docker stop wealist-postgres
@@ -210,7 +226,12 @@ main() {
 
     echo -e "${BOLD}예상 결과:${NC}"
     echo -e "  - Liveness:  ${GREEN}모두 LIVE${NC} (서비스 프로세스는 살아있음)"
-    echo -e "  - Readiness: ${YELLOW}모두 NOT READY${NC} (DB 연결 없음)"
+    echo -e "  - Readiness:"
+    echo -e "      ${GREEN}auth-service  → READY${NC} (Redis만 체크, DB 무관)"
+    echo -e "      ${YELLOW}user-service  → NOT READY${NC} (PostgreSQL 연결 없음)"
+    echo -e "      ${YELLOW}board-service → NOT READY${NC} (PostgreSQL 연결 없음)"
+    echo -e "      ${YELLOW}chat-service  → NOT READY${NC} (PostgreSQL 연결 없음)"
+    echo -e "      ${YELLOW}noti-service  → NOT READY${NC} (PostgreSQL 연결 없음)"
     echo ""
 
     # Step 6: 컨테이너 상태 확인
@@ -219,10 +240,11 @@ main() {
     echo ""
 
     local all_alive=true
-    check_container_status "wealist-user-service" || all_alive=false
     check_container_status "wealist-auth-service" || all_alive=false
+    check_container_status "wealist-user-service" || all_alive=false
     check_container_status "wealist-board-service" || all_alive=false
     check_container_status "wealist-chat-service" || all_alive=false
+    check_container_status "wealist-noti-service" || all_alive=false
 
     echo ""
 
@@ -276,15 +298,20 @@ main() {
     echo -e "${BOLD}테스트 요약:${NC}"
     echo ""
     echo "  1. 정상 상태: Liveness ✓, Readiness ✓"
-    echo "  2. DB 중지:   Liveness ✓, Readiness ✗ (예상대로)"
+    echo "  2. DB 중지:   Liveness ✓, Readiness ✗ (auth 제외 - Redis만 사용)"
     echo "  3. 컨테이너:  재시작 없이 유지됨"
     echo "  4. DB 복구:   Liveness ✓, Readiness ✓"
     echo ""
     echo -e "${GREEN}${BOLD}Health Check 분리가 올바르게 구성되었습니다!${NC}"
     echo ""
-    echo -e "${BOLD}EKS 배포 시:${NC}"
-    echo "  - livenessProbe:  /actuator/health/liveness 또는 /health"
-    echo "  - readinessProbe: /actuator/health/readiness 또는 /ready"
+    echo -e "${BOLD}서비스별 Health Endpoint:${NC}"
+    echo -e "  ${CYAN}auth-service${NC}  (Spring Boot)"
+    echo "    - liveness:  /actuator/health/liveness"
+    echo "    - readiness: /actuator/health/readiness (Redis 체크)"
+    echo ""
+    echo -e "  ${CYAN}user/board/chat/noti-service${NC}  (Go)"
+    echo "    - liveness:  /health"
+    echo "    - readiness: /ready (PostgreSQL 체크)"
     echo ""
 }
 

@@ -11,6 +11,7 @@ import (
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"project-board-api/internal/client"
 	"project-board-api/internal/domain"
 	"project-board-api/internal/dto"
 	"project-board-api/internal/metrics"
@@ -36,6 +37,7 @@ type boardServiceImpl struct {
 	attachmentRepo       repository.AttachmentRepository
 	s3Client             S3Client
 	fieldOptionConverter FieldOptionConverter
+	notificationClient   client.NotificationClient
 	metrics              *metrics.Metrics
 	logger               *zap.Logger
 }
@@ -56,6 +58,7 @@ func NewBoardService(
 	attachmentRepo repository.AttachmentRepository,
 	s3Client S3Client,
 	fieldOptionConverter FieldOptionConverter,
+	notificationClient client.NotificationClient,
 	m *metrics.Metrics,
 	logger *zap.Logger,
 ) BoardService {
@@ -67,6 +70,7 @@ func NewBoardService(
 		attachmentRepo:       attachmentRepo,
 		s3Client:             s3Client,
 		fieldOptionConverter: fieldOptionConverter,
+		notificationClient:   notificationClient,
 		metrics:              m,
 		logger:               logger,
 	}
@@ -183,14 +187,16 @@ func (s *boardServiceImpl) CreateBoard(ctx context.Context, req *dto.CreateBoard
 	}
 
 	// Add participants if provided
+	var addedParticipantIDs []uuid.UUID
 	if len(req.Participants) > 0 {
-		successCount, err := s.addParticipantsInternal(ctx, board.ID, req.Participants)
+		addedIDs, err := s.addParticipantsInternal(ctx, board.ID, req.Participants)
 		if err != nil {
 			s.logger.Warn("Error occurred while adding participants during board creation",
 				zap.String("board_id", board.ID.String()),
-				zap.Int("success_count", successCount),
+				zap.Int("success_count", len(addedIDs)),
 				zap.Error(err))
 		}
+		addedParticipantIDs = addedIDs
 
 		// Reload board with participants to include them in response
 		reloadedBoard, err := s.boardRepo.FindByID(ctx, board.ID)
@@ -206,6 +212,16 @@ func (s *boardServiceImpl) CreateBoard(ctx context.Context, req *dto.CreateBoard
 
 	// 생성된 Attachments를 Board 객체에 할당 (타입 변환 적용)
 	board.Attachments = toDomainAttachments(createdAttachments)
+
+	// Send notification if assignee is different from author
+	if board.AssigneeID != nil && *board.AssigneeID != authorID {
+		s.sendTaskAssignedNotification(ctx, authorID, *board.AssigneeID, req.ProjectID, board.ID, board.Title)
+	}
+
+	// Send notifications to participants (excluding assignee who already got notified)
+	if len(addedParticipantIDs) > 0 {
+		s.sendParticipantAddedNotifications(ctx, authorID, addedParticipantIDs, req.ProjectID, board.ID, board.Title, board.AssigneeID)
+	}
 
 	// Convert to response DTO
 	return s.toBoardResponse(board), nil
@@ -287,6 +303,9 @@ func (s *boardServiceImpl) GetBoardsByProject(ctx context.Context, projectID uui
 
 // UpdateBoard updates a board's attributes
 func (s *boardServiceImpl) UpdateBoard(ctx context.Context, boardID uuid.UUID, req *dto.UpdateBoardRequest) (*dto.BoardResponse, error) {
+	// Extract user_id from context for notification
+	actorID, _ := ctx.Value("user_id").(uuid.UUID)
+
 	// Fetch existing board
 	board, err := s.boardRepo.FindByID(ctx, boardID)
 	if err != nil {
@@ -295,6 +314,9 @@ func (s *boardServiceImpl) UpdateBoard(ctx context.Context, boardID uuid.UUID, r
 		}
 		return nil, response.NewAppError(response.ErrCodeInternal, "Failed to fetch board", err.Error())
 	}
+
+	// Store old assignee for notification comparison
+	oldAssigneeID := board.AssigneeID
 
 	// Determine the effective start and due dates for validation
 	effectiveStartDate := board.StartDate
@@ -448,6 +470,17 @@ func (s *boardServiceImpl) UpdateBoard(ctx context.Context, boardID uuid.UUID, r
 		board.Attachments = toDomainAttachments(allAttachments)
 	}
 
+	// Send notification if assignee changed to a new person
+	if board.AssigneeID != nil && actorID != uuid.Nil {
+		// Check if assignee actually changed
+		assigneeChanged := (oldAssigneeID == nil && board.AssigneeID != nil) ||
+			(oldAssigneeID != nil && board.AssigneeID != nil && *oldAssigneeID != *board.AssigneeID)
+
+		if assigneeChanged && *board.AssigneeID != actorID {
+			s.sendTaskAssignedNotification(ctx, actorID, *board.AssigneeID, board.ProjectID, board.ID, board.Title)
+		}
+	}
+
 	// Convert to response DTO
 	return s.toBoardResponse(board), nil
 }
@@ -593,12 +626,12 @@ func (s *boardServiceImpl) toBoardDetailResponse(board *domain.Board) *dto.Board
 
 // addParticipantsInternal is an internal helper to add participants during board creation
 // It does not verify board existence (assumes board was just created)
-// Returns the number of successfully added participants and any errors
-func (s *boardServiceImpl) addParticipantsInternal(ctx context.Context, boardID uuid.UUID, userIDs []uuid.UUID) (int, error) {
+// Returns the list of successfully added participant user IDs and any errors
+func (s *boardServiceImpl) addParticipantsInternal(ctx context.Context, boardID uuid.UUID, userIDs []uuid.UUID) ([]uuid.UUID, error) {
 	// Remove duplicates from the user IDs
 	uniqueUserIDs := removeDuplicateUUIDs(userIDs)
 
-	successCount := 0
+	var addedUserIDs []uuid.UUID
 	var failedUserIDs []uuid.UUID
 
 	// Process each participant individually
@@ -639,19 +672,19 @@ func (s *boardServiceImpl) addParticipantsInternal(ctx context.Context, boardID 
 			continue
 		}
 
-		successCount++
+		addedUserIDs = append(addedUserIDs, userID)
 	}
 
 	// Log summary if there were failures
 	if len(failedUserIDs) > 0 {
 		s.logger.Warn("Some participants failed to be added during board creation",
 			zap.String("board_id", boardID.String()),
-			zap.Int("success_count", successCount),
+			zap.Int("success_count", len(addedUserIDs)),
 			zap.Int("failed_count", len(failedUserIDs)),
 			zap.Any("failed_user_ids", failedUserIDs))
 	}
 
-	return successCount, nil
+	return addedUserIDs, nil
 }
 
 // validateAndConfirmAttachments validates that attachments exist and are in TEMP status
@@ -722,4 +755,97 @@ func (s *boardServiceImpl) deleteAttachmentsWithS3(ctx context.Context, attachme
 				zap.Error(err))
 		}
 	}
+}
+
+// sendTaskAssignedNotification sends a notification when a task is assigned
+func (s *boardServiceImpl) sendTaskAssignedNotification(ctx context.Context, actorID, targetUserID, projectID, boardID uuid.UUID, boardTitle string) {
+	if s.notificationClient == nil {
+		return
+	}
+
+	// Get workspace ID from project
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		s.logger.Warn("Failed to get project for notification",
+			zap.String("project_id", projectID.String()),
+			zap.Error(err))
+		return
+	}
+
+	event := client.NotificationEvent{
+		Type:         client.NotificationTaskAssigned,
+		ActorID:      actorID,
+		TargetUserID: targetUserID,
+		WorkspaceID:  project.WorkspaceID,
+		ResourceType: "task",
+		ResourceID:   boardID,
+		ResourceName: boardTitle,
+		Metadata: map[string]interface{}{
+			"projectId":   projectID.String(),
+			"projectName": project.Name,
+		},
+	}
+
+	go func() {
+		if err := s.notificationClient.SendNotification(context.Background(), event); err != nil {
+			s.logger.Warn("Failed to send task assigned notification",
+				zap.String("target_user_id", targetUserID.String()),
+				zap.Error(err))
+		}
+	}()
+}
+
+// sendParticipantAddedNotifications sends notifications to participants when added to a board
+func (s *boardServiceImpl) sendParticipantAddedNotifications(ctx context.Context, actorID uuid.UUID, participantIDs []uuid.UUID, projectID, boardID uuid.UUID, boardTitle string, assigneeID *uuid.UUID) {
+	if s.notificationClient == nil || len(participantIDs) == 0 {
+		return
+	}
+
+	// Get workspace ID from project
+	project, err := s.projectRepo.FindByID(ctx, projectID)
+	if err != nil {
+		s.logger.Warn("Failed to get project for participant notification",
+			zap.String("project_id", projectID.String()),
+			zap.Error(err))
+		return
+	}
+
+	// Build notification events for each participant
+	var events []client.NotificationEvent
+	for _, participantID := range participantIDs {
+		// Skip if participant is the actor (don't notify yourself)
+		if participantID == actorID {
+			continue
+		}
+		// Skip if participant is the assignee (they already got TASK_ASSIGNED notification)
+		if assigneeID != nil && participantID == *assigneeID {
+			continue
+		}
+
+		events = append(events, client.NotificationEvent{
+			Type:         client.NotificationParticipantAdded,
+			ActorID:      actorID,
+			TargetUserID: participantID,
+			WorkspaceID:  project.WorkspaceID,
+			ResourceType: "task",
+			ResourceID:   boardID,
+			ResourceName: boardTitle,
+			Metadata: map[string]interface{}{
+				"projectId":   projectID.String(),
+				"projectName": project.Name,
+			},
+		})
+	}
+
+	if len(events) == 0 {
+		return
+	}
+
+	go func() {
+		if err := s.notificationClient.SendBulkNotifications(context.Background(), events); err != nil {
+			s.logger.Warn("Failed to send participant added notifications",
+				zap.Int("count", len(events)),
+				zap.Error(err))
+		}
+	}()
 }

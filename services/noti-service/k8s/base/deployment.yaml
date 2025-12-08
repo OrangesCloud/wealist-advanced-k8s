@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noti-service
+  labels:
+    app: noti-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noti-service
+  template:
+    metadata:
+      labels:
+        app: noti-service
+    spec:
+      containers:
+        - name: noti-service
+          image: noti-service:latest
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - configMapRef:
+                name: noti-service-config
+            - secretRef:
+                name: noti-service-secret
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8084
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8084
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

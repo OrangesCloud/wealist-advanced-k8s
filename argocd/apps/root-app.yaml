@@ -1,17 +1,13 @@
-# ArgoCD App-of-Apps pattern
-# This root application manages all other applications
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: wealist-root
+  name: wealist-apps
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
   project: wealist
   source:
-    repoURL: https://github.com/YOUR_ORG/wealist-project-advanced.git  # TODO: Update
-    targetRevision: HEAD
+    repoURL: https://github.com/your-org/wealist-project-advanced.git
+    targetRevision: main
     path: argocd/apps
   destination:
     server: https://kubernetes.default.svc
@@ -20,5 +16,3 @@ spec:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true

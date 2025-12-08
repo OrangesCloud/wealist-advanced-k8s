@@ -44,7 +44,8 @@ export const createOrGetDMChat = async (
     const newChat = await createChat({
       workspaceId,
       chatType: 'DM',
-      participantIds: [targetUserId],
+      chatName: 'DM',
+      participants: [targetUserId],
     });
 
     console.log('✅ 새 채팅방 생성 완료:', newChat.chatId);

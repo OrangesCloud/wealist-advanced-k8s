@@ -1,312 +1,214 @@
-// internal/handler/message_handler.go
 package handler
 
 import (
-	"chat-service/internal/middleware"
-	"chat-service/internal/model"
+	"chat-service/internal/domain"
 	"chat-service/internal/service"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type MessageHandler struct {
-	messageService service.MessageService
-	chatService    service.ChatService
+	chatService *service.ChatService
+	logger      *zap.Logger
 }
 
-func NewMessageHandler(messageService service.MessageService, chatService service.ChatService) *MessageHandler {
+func NewMessageHandler(chatService *service.ChatService, logger *zap.Logger) *MessageHandler {
 	return &MessageHandler{
-		messageService: messageService,
-		chatService:    chatService,
+		chatService: chatService,
+		logger:      logger,
 	}
 }
 
-type SendMessageRequest struct {
-	Content     string  `json:"content" binding:"required"`
-	MessageType string  `json:"messageType" binding:"omitempty,oneof=TEXT IMAGE FILE"`
-	FileURL     *string `json:"fileUrl"`
-	FileName    *string `json:"fileName"`
-	FileSize    *int64  `json:"fileSize"`
-}
-
-type MarkAsReadRequest struct {
-	MessageIDs []string `json:"messageIds" binding:"required,min=1"`
-}
-
-// GetMessages godoc
-// @Summary      메시지 히스토리 조회
-// @Description  채팅방의 메시지 히스토리를 조회합니다 (페이지네이션)
-// @Tags         message
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Param        limit query int false "페이지 크기 (기본: 50, 최대: 100)" default(50)
-// @Param        offset query int false "오프셋 (기본: 0)" default(0)
-// @Success      200 {array} handler.MessageResponse
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      403 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/{chatId} [get]
-// @Security     BearerAuth
+// GetMessages returns messages from a chat
 func (h *MessageHandler) GetMessages(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	// 참여자인지 확인
-	isParticipant, err := h.chatService.IsParticipant(chatID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if !isParticipant {
-		c.JSON(http.StatusForbidden, gin.H{"error": "You are not a participant of this chat"})
+	// Verify user is in chat
+	inChat, _ := h.chatService.IsUserInChat(c.Request.Context(), chatID, userID)
+	if !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
 		return
 	}
 
-	// 쿼리 파라미터 파싱
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	var before *uuid.UUID
+	if beforeStr := c.Query("before"); beforeStr != "" {
+		if b, err := uuid.Parse(beforeStr); err == nil {
+			before = &b
+		}
+	}
 
-	messages, err := h.messageService.GetMessages(chatID, limit, offset)
+	messages, err := h.chatService.GetMessages(c.Request.Context(), chatID, limit, before)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.Error("failed to get messages", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to get messages"},
+		})
 		return
 	}
 
-	// 🔥 DTO로 변환
-	c.JSON(http.StatusOK, ToMessageResponses(messages))
+	c.JSON(http.StatusOK, messages)
 }
 
-// SendMessage godoc
-// @Summary      메시지 전송
-// @Description  채팅방에 메시지를 전송합니다 (REST fallback, WebSocket 권장)
-// @Tags         message
-// @Accept       json
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Param        request body SendMessageRequest true "메시지 내용"
-// @Success      201 {object} handler.MessageResponse
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      403 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/{chatId} [post]
-// @Security     BearerAuth
+// SendMessage sends a message to a chat
 func (h *MessageHandler) SendMessage(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	var req SendMessageRequest
+	// Verify user is in chat
+	inChat, _ := h.chatService.IsUserInChat(c.Request.Context(), chatID, userID)
+	if !inChat {
+		c.JSON(http.StatusForbidden, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "FORBIDDEN", "message": "Not a participant"},
+		})
+		return
+	}
+
+	var req domain.SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": err.Error()},
+		})
 		return
 	}
 
-	messageType := model.MessageTypeText
-	if req.MessageType != "" {
-		messageType = model.MessageType(req.MessageType)
-	}
-
-	message, err := h.messageService.CreateMessage(
-		chatID,
-		userID,
-		"", // 🔥 REST fallback - userName은 WebSocket에서만 제공
-		req.Content,
-		messageType,
-		req.FileURL,
-		req.FileName,
-		req.FileSize,
-	)
+	message, err := h.chatService.SendMessage(c.Request.Context(), chatID, userID, &req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.Error("failed to send message", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to send message"},
+		})
 		return
 	}
 
-	// 🔥 DTO로 변환
-	c.JSON(http.StatusCreated, ToMessageResponse(message))
+	c.JSON(http.StatusCreated, message)
 }
 
-// DeleteMessage godoc
-// @Summary      메시지 삭제
-// @Description  메시지를 삭제합니다 (Soft Delete)
-// @Tags         message
-// @Produce      json
-// @Param        messageId path string true "Message ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {object} map[string]string
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/{messageId} [delete]
-// @Security     BearerAuth
+// DeleteMessage soft deletes a message
 func (h *MessageHandler) DeleteMessage(c *gin.Context) {
 	messageID, err := uuid.Parse(c.Param("messageId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid message ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid message ID"},
+		})
 		return
 	}
 
-	if err := h.messageService.DeleteMessage(messageID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.chatService.DeleteMessage(c.Request.Context(), messageID); err != nil {
+		h.logger.Error("failed to delete message", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to delete message"},
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Message deleted successfully"})
+	c.Status(http.StatusNoContent)
 }
 
-// MarkMessagesAsRead godoc
-// @Summary      메시지 읽음 처리
-// @Description  여러 메시지를 읽음으로 처리합니다
-// @Tags         message
-// @Accept       json
-// @Produce      json
-// @Param        request body MarkAsReadRequest true "읽은 메시지 ID 목록"
-// @Success      200 {object} map[string]string
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/read [post]
-// @Security     BearerAuth
+// MarkMessagesAsRead marks messages as read
 func (h *MessageHandler) MarkMessagesAsRead(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
+	var req struct {
+		MessageIDs []uuid.UUID `json:"messageIds" binding:"required,min=1"`
 	}
-
-	var req MarkAsReadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": err.Error()},
+		})
 		return
 	}
 
-	for _, msgIDStr := range req.MessageIDs {
-		messageID, err := uuid.Parse(msgIDStr)
-		if err != nil {
-			continue
-		}
-
-		if err := h.messageService.MarkAsRead(messageID, userID); err != nil {
-			continue
-		}
+	if err := h.chatService.MarkMessagesAsRead(c.Request.Context(), req.MessageIDs, userID); err != nil {
+		h.logger.Error("failed to mark messages as read", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to mark as read"},
+		})
+		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Messages marked as read"})
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// GetUnreadCount godoc
-// @Summary      읽지 않은 메시지 수 조회
-// @Description  채팅방의 읽지 않은 메시지 수를 조회합니다
-// @Tags         message
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {object} map[string]int
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/{chatId}/unread [get]
-// @Security     BearerAuth
+// GetUnreadCount returns unread count for a chat
 func (h *MessageHandler) GetUnreadCount(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	count, err := h.messageService.GetUnreadCount(chatID, userID)
+	count, err := h.chatService.GetUnreadCount(c.Request.Context(), chatID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		h.logger.Error("failed to get unread count", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to get unread count"},
+		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"unreadCount": count})
 }
 
-// UpdateLastRead godoc
-// @Summary      마지막 읽은 시간 업데이트
-// @Description  채팅방의 마지막 읽은 시간을 현재 시간으로 업데이트합니다
-// @Tags         message
-// @Produce      json
-// @Param        chatId path string true "Chat ID" example:"550e8400-e29b-41d4-a716-446655440000"
-// @Success      200 {object} map[string]string
-// @Failure      400 {object} map[string]string
-// @Failure      401 {object} map[string]string
-// @Failure      500 {object} map[string]string
-// @Router       /messages/{chatId}/last-read [put]
-// @Security     BearerAuth
+// UpdateLastRead updates last read timestamp
 func (h *MessageHandler) UpdateLastRead(c *gin.Context) {
-	userIDStr, exists := middleware.GetUserID(c)
-	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
-		return
-	}
-
-	userID, err := uuid.Parse(userIDStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
-		return
-	}
+	userID := c.MustGet("user_id").(uuid.UUID)
 
 	chatID, err := uuid.Parse(c.Param("chatId"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid chat ID"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "BAD_REQUEST", "message": "Invalid chat ID"},
+		})
 		return
 	}
 
-	if err := h.chatService.UpdateLastRead(chatID, userID); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.chatService.UpdateLastReadAt(c.Request.Context(), chatID, userID); err != nil {
+		h.logger.Error("failed to update last read", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   gin.H{"code": "INTERNAL_ERROR", "message": "Failed to update last read"},
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Last read time updated"})
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }

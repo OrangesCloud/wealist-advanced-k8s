@@ -1,4 +1,3 @@
-// internal/middleware/logger.go
 package middleware
 
 import (
@@ -8,37 +7,25 @@ import (
 	"go.uber.org/zap"
 )
 
-func Logger(logger *zap.Logger) gin.HandlerFunc {
+func LoggerMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
-		query := c.Request.URL.RawQuery
+
+		// Skip health check endpoints
+		if path == "/health" || path == "/ready" {
+			c.Next()
+			return
+		}
 
 		c.Next()
 
-		duration := time.Since(start)
-		status := c.Writer.Status()
-
-		fields := []zap.Field{
+		logger.Info("request",
 			zap.String("method", c.Request.Method),
 			zap.String("path", path),
-			zap.String("query", query),
-			zap.Int("status", status),
-			zap.Duration("duration", duration),
+			zap.Int("status", c.Writer.Status()),
+			zap.Duration("duration", time.Since(start)),
 			zap.String("client_ip", c.ClientIP()),
-			zap.String("user_agent", c.Request.UserAgent()),
-		}
-
-		if userID, exists := c.Get("userId"); exists {
-			fields = append(fields, zap.String("user_id", userID.(string)))
-		}
-
-		if status >= 500 {
-			logger.Error("Server error", fields...)
-		} else if status >= 400 {
-			logger.Warn("Client error", fields...)
-		} else {
-			logger.Info("Request completed", fields...)
-		}
+		)
 	}
 }

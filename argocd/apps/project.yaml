@@ -1,33 +1,20 @@
-# ArgoCD Project for wealist
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
   name: wealist
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
-  description: Wealist project applications
-
-  # Allow manifests from this repo
+  description: Wealist Project
   sourceRepos:
-    - https://github.com/YOUR_ORG/wealist-project-advanced.git  # TODO: Update
-
-  # Allow deploying to these namespaces
+    - '*'
   destinations:
-    - namespace: wealist
+    - namespace: wealist-dev
       server: https://kubernetes.default.svc
-    - namespace: wealist-local
+    - namespace: wealist-prod
       server: https://kubernetes.default.svc
-    - namespace: argocd
-      server: https://kubernetes.default.svc
-
-  # Allow all cluster-scoped resources
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace
-
-  # Allow all namespaced resources
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'

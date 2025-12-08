@@ -45,7 +45,7 @@ const CommentInput = ({ boardId, workspaceId, onCommentCreated }: CommentInputPr
 
       if (selectedFile) {
         const uploaded = await uploadAttachment(selectedFile, 'COMMENT', workspaceId);
-        attachmentIds.push(uploaded.id);
+        attachmentIds.push(uploaded.attachmentId);
       }
 
       await createComment({
@@ -221,7 +221,7 @@ const CommentItem = ({
       // 1. 새 파일 업로드 (기존 파일 대체)
       if (selectedFile) {
         const uploaded = await uploadAttachment(selectedFile, 'COMMENT', workspaceId);
-        attachmentIds = [uploaded.id];
+        attachmentIds = [uploaded.attachmentId];
       } else if (hasExistingAttachment) {
         // 2. 파일 변경 없음 (기존 유지): hook이 기존 파일 정보를 보존하고 있을 때
         // (selectedFile이 null이고, hook이 초기 파일 정보를 갖고 있을 때)
@@ -241,7 +241,7 @@ const CommentItem = ({
         // 이 컴포넌트에서 파일 유지/삭제 상태를 별도로 관리해야 합니다.
 
         // 현재 코드에서는 파일 변경이 없으면 기존 attachmentId를 유지
-        attachmentIds = [existingAttachment.id];
+        attachmentIds = [existingAttachment.attachmentId];
       }
 
       // 만약 사용자가 UI에서 파일을 삭제했는데, DB에도 해당 파일이 있었다면,

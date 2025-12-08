@@ -9,6 +9,7 @@ import {
   createJoinRequest,
   getPublicWorkspaces,
   inviteUser,
+  getAllMyProfiles,
 } from '../api/userService';
 import { Search, Plus, X, AlertCircle, Settings, LogOut } from 'lucide-react';
 import {
@@ -296,7 +297,7 @@ const SelectWorkspacePage: React.FC = () => {
         <div className="flex items-center justify-between mb-6 pb-4">
           <div className="flex items-center gap-2">
             <span className={`${theme.font.size.sm} ${theme.colors.text}`}>
-              {userEmail ? `반갑습니다, ${nickName}님!` : '환영합니다!'}
+              {nickName ? `반갑습니다, ${nickName}님!` : '환영합니다!'}
             </span>
           </div>
           <button

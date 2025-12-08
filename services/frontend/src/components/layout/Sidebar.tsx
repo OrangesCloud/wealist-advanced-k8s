@@ -8,20 +8,26 @@ interface SidebarProps {
   workspaceId: string;
   userProfile: UserProfileResponse | null;
   isChatActive: boolean;
+  isNotificationActive: boolean;
   onChatToggle: () => void;
+  onNotificationToggle: () => void;
   onUserMenuToggle: () => void;
   onStartChat?: (member: WorkspaceMemberResponse) => Promise<void>;
   totalUnreadCount?: number; // 🔥 총 읽지 않은 메시지 수
+  notificationUnreadCount?: number; // 알림 읽지 않은 수
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   workspaceId,
   userProfile,
   isChatActive,
+  isNotificationActive,
   onChatToggle,
+  onNotificationToggle,
   onUserMenuToggle,
   onStartChat,
   totalUnreadCount = 0,
+  notificationUnreadCount = 0,
 }) => {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -78,12 +84,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          <button
-            className="w-12 h-12 rounded-lg mx-auto flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white opacity-50 transition"
-            title="알림"
-          >
-            <Bell className="w-6 h-6" />
-          </button>
+          {/* 알림 버튼 */}
+          <div className="relative mx-auto">
+            <button
+              onClick={onNotificationToggle}
+              className={`w-12 h-12 rounded-lg flex items-center justify-center transition ${
+                isNotificationActive
+                  ? 'bg-blue-600 text-white ring-2 ring-white/50'
+                  : 'hover:bg-blue-600/50 text-white/80 ring-1 ring-white/20'
+              }`}
+              title="알림"
+            >
+              <Bell className="w-6 h-6" />
+            </button>
+            {/* 읽지 않은 알림 배지 */}
+            {notificationUnreadCount > 0 && !isNotificationActive && (
+              <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold ring-2 ring-gray-800">
+                {notificationUnreadCount > 9 ? '9+' : notificationUnreadCount}
+              </div>
+            )}
+          </div>
           <button
             className="w-12 h-12 rounded-lg mx-auto flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white opacity-50 transition"
             title="파일"

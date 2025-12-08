@@ -27,6 +27,7 @@ import { CustomFieldManageModal } from '../components/modals/board/customFields/
 import { BoardManageModal } from '../components/modals/board/BoardManageModal';
 import { IROLES } from '../types/common';
 import { ProjectManageModal } from '../components/modals/board/ProjectManageModal';
+import type { Notification } from '../types/notification';
 
 interface MainDashboardProps {
   onLogout: () => void;
@@ -234,12 +235,33 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ onLogout }) => {
     [toggleUiState],
   );
 
+  // 알림 클릭 시 해당 프로젝트/보드로 이동
+  const handleNotificationClick = useCallback(
+    (notification: Notification) => {
+      const projectId = notification.metadata?.projectId as string;
+      const boardId = notification.resourceId;
+
+      if (projectId && boardId) {
+        // 프로젝트 선택
+        const targetProject = projects.find((p) => p.projectId === projectId);
+        if (targetProject) {
+          setSelectedProject(targetProject);
+        }
+
+        // 보드 ID를 localStorage에 저장 (ProjectContent에서 처리)
+        localStorage.setItem('pendingBoardId', boardId);
+      }
+    },
+    [projects],
+  );
+
   return (
     <MainLayout
       onLogout={onLogout}
       workspaceId={currentWorkspaceId}
       projectId={selectedProject?.projectId} // 🔥 추가
       onProfileModalOpen={() => toggleUiState('showUserProfile', true)}
+      onNotificationClick={handleNotificationClick}
     >
       {/* 🔥 Render prop: handleStartChat을 받아서 ProjectHeader에 전달 */}
       {(handleStartChat) => (

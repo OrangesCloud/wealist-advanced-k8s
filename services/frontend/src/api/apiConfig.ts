@@ -14,12 +14,16 @@ const getApiBaseUrl = (path: string): string => {
     const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
 
     if (isLocalDevelopment) {
-      // 🔥 로컬 개발: 각 서비스별 포트 직접 지정
-      if (path?.includes('/api/auth')) return `${INJECTED_API_BASE_URL}:8080`; // auth-service
+      // 🔥 로컬 개발: 각 서비스별 포트 지정
+      // auth-service: refresh 호출이 '/refresh'만 사용하므로 context path 포함
+      if (path?.includes('/api/auth')) return `${INJECTED_API_BASE_URL}:8080/api/auth`; // auth-service
+      // user-service: 요청이 full path 사용 (/api/users/*, /api/workspaces/*, /api/profiles/*)
       if (path?.includes('/api/users')) return `${INJECTED_API_BASE_URL}:8090`; // user-service
       if (path?.includes('/api/workspaces')) return `${INJECTED_API_BASE_URL}:8090`; // user-service (workspaces)
+      if (path?.includes('/api/profiles')) return `${INJECTED_API_BASE_URL}:8090`; // user-service (profiles)
       if (path?.includes('/api/boards')) return `${INJECTED_API_BASE_URL}:8000/api`;
       if (path?.includes('/api/chats')) return `${INJECTED_API_BASE_URL}:8001${path}`;
+      if (path?.includes('/api/notifications')) return `${INJECTED_API_BASE_URL}:8002`;
     }
 
     return `${INJECTED_API_BASE_URL}${path}`;
@@ -31,8 +35,10 @@ const getApiBaseUrl = (path: string): string => {
 
 export const AUTH_SERVICE_API_URL = getApiBaseUrl('/api/auth'); // auth-service (토큰 관리)
 export const USER_REPO_API_URL = getApiBaseUrl('/api/users');
+export const USER_SERVICE_API_URL = getApiBaseUrl('/api/users'); // 💡 user-service base URL (프로필 API용)
 export const BOARD_SERVICE_API_URL = getApiBaseUrl('/api/boards/api');
 export const CHAT_SERVICE_API_URL = getApiBaseUrl('/api/chats');
+export const NOTI_SERVICE_API_URL = getApiBaseUrl('/api/notifications');
 
 // ============================================================================
 // Axios 인스턴스 생성
@@ -70,6 +76,15 @@ export const boardServiceClient = axios.create({
  */
 export const chatServiceClient = axios.create({
   baseURL: CHAT_SERVICE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+});
+
+/**
+ * Notification Service API (Go)를 위한 Axios 인스턴스
+ */
+export const notiServiceClient = axios.create({
+  baseURL: NOTI_SERVICE_API_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
@@ -223,11 +238,13 @@ setupRequestInterceptor(authServiceClient);
 setupRequestInterceptor(userRepoClient);
 setupRequestInterceptor(boardServiceClient);
 setupRequestInterceptor(chatServiceClient);
+setupRequestInterceptor(notiServiceClient);
 
 setupUnifiedResponseInterceptor(authServiceClient);
 setupUnifiedResponseInterceptor(userRepoClient);
 setupUnifiedResponseInterceptor(boardServiceClient);
 setupUnifiedResponseInterceptor(chatServiceClient);
+setupUnifiedResponseInterceptor(notiServiceClient);
 
 export const getAuthHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,

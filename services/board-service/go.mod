@@ -1,6 +1,8 @@
 module project-board-api
 
-go 1.25.4
+go 1.24.0
+
+toolchain go1.24.7
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.40.0
@@ -15,7 +17,6 @@ require (
 	github.com/leanovate/gopter v0.2.11
 	github.com/prometheus/client_golang v1.19.0
 	github.com/prometheus/client_model v0.5.0
-	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1

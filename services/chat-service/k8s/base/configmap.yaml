@@ -1,9 +1,17 @@
-# chat-service ConfigMap
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: chat-service-config
 data:
-  SERVER_PORT: "8001"
-  SERVER_BASE_PATH: "/api/chats"
-  # TODO: Add more config values
+  PORT: "8083"
+  GIN_MODE: "release"
+  # Database
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "chat_db"
+  # Redis
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  # Service URLs
+  USER_SERVICE_URL: "http://user-service:8080"
+  AUTH_SERVICE_URL: "http://auth-service:8081"

@@ -29,12 +29,12 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({ member, index, size 
       key={member.userId}
       className={`${sizeClasses} rounded-full flex items-center justify-center font-bold ring-1 ring-white overflow-hidden flex-shrink-0`}
       style={{ zIndex: index }}
-      title={`${member.userName} (${member.roleName})`}
+      title={`${member.nickName || member.userEmail || 'Unknown'} (${member.roleName})`}
     >
       {member?.profileImageUrl ? (
         <img
           src={member?.profileImageUrl}
-          alt={member?.userName}
+          alt={member?.nickName || member?.userEmail}
           className="w-full h-full object-cover"
         />
       ) : (
@@ -43,7 +43,7 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({ member, index, size 
             index,
           )}`}
         >
-          {member?.userName[0]}
+          {member?.nickName?.[0] || member?.userEmail?.[0] || '?'}
         </div>
       )}
     </div>
@@ -53,9 +53,11 @@ export const MemberAvatar: React.FC<MemberAvatarProps> = ({ member, index, size 
 interface AvatarStackProps {
   members: WorkspaceMemberResponse[];
   onChatClick?: (member: WorkspaceMemberResponse) => void;
+  /** false로 설정하면 button 대신 div로 렌더링 (부모가 button일 때 사용) */
+  interactive?: boolean;
 }
 
-export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }) => {
+export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick, interactive = true }) => {
   const { theme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
@@ -134,6 +136,53 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }
     return onlineUsers.has(userId);
   };
 
+  // 아바타 렌더링 공통 컴포넌트
+  const avatarContent = (
+    <>
+      {displayMembers?.map((member, index) => (
+        <div
+          key={member.userId}
+          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-1 ring-white overflow-hidden"
+          style={{ zIndex: members.length - index }}
+          title={`${member.nickName || member.userEmail || 'Unknown'} (${member.roleName})`}
+        >
+          {member?.profileImageUrl ? (
+            <img
+              src={member?.profileImageUrl}
+              alt={member?.nickName || member?.userEmail}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div
+              className={`w-full h-full flex items-center justify-center text-white ${getColorByIndex(
+                index,
+              )}`}
+            >
+              {member?.nickName?.[0] || member?.userEmail?.[0] || '?'}
+            </div>
+          )}
+        </div>
+      ))}
+      {remainingCount > 0 && (
+        <div
+          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-1 ring-white bg-gray-400 text-white"
+          style={{ zIndex: 0 }}
+        >
+          +{remainingCount}
+        </div>
+      )}
+    </>
+  );
+
+  // interactive=false면 div만 렌더링 (드롭다운 없음)
+  if (!interactive) {
+    return (
+      <div className="flex -space-x-1.5 overflow-hidden">
+        {avatarContent}
+      </div>
+    );
+  }
+
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Avatar Stack Button */}
@@ -141,38 +190,7 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }
         onClick={() => setShowDropdown(!showDropdown)}
         className="flex -space-x-1.5 p-1 pr-0 overflow-hidden hover:opacity-80 transition"
       >
-        {displayMembers?.map((member, index) => (
-          <div
-            key={member.userId}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-1 ring-white overflow-hidden"
-            style={{ zIndex: members.length - index }}
-            title={`${member.userName} (${member.roleName})`}
-          >
-            {member?.profileImageUrl ? (
-              <img
-                src={member?.profileImageUrl}
-                alt={member?.userName}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div
-                className={`w-full h-full flex items-center justify-center text-white ${getColorByIndex(
-                  index,
-                )}`}
-              >
-                {member?.userName[0]}
-              </div>
-            )}
-          </div>
-        ))}
-        {remainingCount > 0 && (
-          <div
-            className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ring-1 ring-white bg-gray-400 text-white"
-            style={{ zIndex: 0 }}
-          >
-            +{remainingCount}
-          </div>
-        )}
+        {avatarContent}
       </button>
 
       {/* Members Dropdown */}
@@ -212,7 +230,7 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }
                       {member?.profileImageUrl ? (
                         <img
                           src={member?.profileImageUrl}
-                          alt={member?.userName}
+                          alt={member?.nickName || member?.userEmail}
                           className="w-10 h-10 rounded-full object-cover"
                         />
                       ) : (
@@ -221,7 +239,7 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }
                             members.indexOf(member),
                           )}`}
                         >
-                          {member?.userName[0]}
+                          {member?.nickName?.[0] || member?.userEmail?.[0] || '?'}
                         </div>
                       )}
                       {/* 🔥 Online Status Indicator */}
@@ -236,7 +254,7 @@ export const AvatarStack: React.FC<AvatarStackProps> = ({ members, onChatClick }
                     {/* Name + Role */}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">
-                        {member.userName}
+                        {member.nickName || member.userEmail || 'Unknown'}
                         {isCurrentUser && <span className="ml-1 text-xs text-gray-400">(나)</span>}
                       </p>
                       <p className="text-xs text-gray-500">{member.roleName}</p>

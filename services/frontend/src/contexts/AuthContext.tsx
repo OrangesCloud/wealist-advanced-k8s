@@ -2,15 +2,17 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom';
 // API 경로 설정 - auth-service 사용
 import { AUTH_SERVICE_API_URL } from '../api/apiConfig';
+import { getAllMyProfiles } from '../api/userService';
 
 interface AuthContextType {
   isAuthenticated: boolean;
   token: string | null;
   nickName: string | null;
   userEmail: string | null;
-  userId: string | null; // ✅ 1. 타입 정의 추가
+  userId: string | null;
   logout: () => void;
   isLoading: boolean;
+  refreshNickName: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,22 +35,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [userId, setUserId] = useState<string | null>(null); // ✅ 2. State 추가
   const [isLoading, setIsLoading] = useState(true);
 
+  // 💡 프로필 API에서 닉네임 가져오기 (userService 사용)
+  const fetchAndSaveNickName = useCallback(async () => {
+    try {
+      const profiles = await getAllMyProfiles();
+      if (profiles && profiles.length > 0 && profiles[0].nickName) {
+        const fetchedNickName = profiles[0].nickName;
+        setNickName(fetchedNickName);
+        localStorage.setItem('nickName', fetchedNickName);
+        console.log('✅ 닉네임 저장 완료:', fetchedNickName);
+      }
+    } catch (e) {
+      console.error('닉네임 가져오기 실패:', e);
+    }
+  }, []);
+
+  // 💡 외부에서 닉네임 새로고침 가능하도록 노출
+  const refreshNickName = useCallback(async () => {
+    await fetchAndSaveNickName();
+  }, [fetchAndSaveNickName]);
+
   // 1. 초기 로딩 시 localStorage에서 토큰 및 ID 로드
   useEffect(() => {
     const storedToken = localStorage.getItem('accessToken');
     const storedReToken = localStorage.getItem('refreshToken');
     const storedNickName = localStorage.getItem('nickName');
     const storedUserEmail = localStorage.getItem('userEmail');
-    const storedUserId = localStorage.getItem('userId'); // ✅ 3. 로컬스토리지 읽기 추가
-    console.log(storedUserId);
-    if (storedToken && storedReToken && storedUserEmail) {
+    const storedUserId = localStorage.getItem('userId');
+
+    // 토큰만 있으면 인증 상태로 간주 (email은 선택사항)
+    if (storedToken && storedReToken) {
       setToken(storedToken);
-      setNickName(storedNickName);
-      setUserEmail(storedUserEmail);
-      if (storedUserId) setUserId(storedUserId); // ✅ 4. State 복구
+      setReToken(storedReToken);
+      if (storedNickName) setNickName(storedNickName);
+      if (storedUserEmail) setUserEmail(storedUserEmail);
+      if (storedUserId) setUserId(storedUserId);
+
+      // 💡 닉네임이 없으면 프로필 API에서 가져오기
+      if (!storedNickName) {
+        fetchAndSaveNickName();
+      }
     }
     setIsLoading(false);
-  }, []);
+  }, [fetchAndSaveNickName]);
 
   // 3. 로그아웃 핸들러
   const logout = useCallback(async () => {
@@ -89,6 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     userId, // ✅ 7. Context Value에 포함
     logout,
     isLoading,
+    refreshNickName, // 💡 닉네임 새로고침 함수 추가
   };
 
   // 💡 HACK: OAuthRedirectPage에서 setLoginState를 직접 호출해야 하므로,

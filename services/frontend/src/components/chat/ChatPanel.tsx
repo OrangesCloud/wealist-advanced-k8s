@@ -24,11 +24,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
   // 현재 사용자 ID
   const currentUserId = localStorage.getItem('userId');
 
-  // 🔥 userId -> userName 매핑 (워크스페이스 멤버 정보에서)
+  // 🔥 userId -> nickName 매핑 (워크스페이스 멤버 정보에서)
   const userNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     members.forEach((m) => {
-      map[m.userId] = m.userName || 'Unknown';
+      map[m.userId] = m.nickName || m.userEmail || 'Unknown';
     });
     return map;
   }, [members]);
@@ -41,8 +41,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
 
       if (event.type === 'MESSAGE_RECEIVED') {
         // 🔥 isMine 계산하여 추가
-        // 백엔드에서 payload 없이 직접 필드를 보내므로 event 자체 사용
-        const messageData = event.payload || event;
+        // 백엔드에서 message 필드 안에 데이터를 보냄
+        const messageData = event.message || event.payload || event;
         const newMessage: Message = {
           messageId: messageData.messageId,
           chatId: messageData.chatId,
@@ -57,11 +57,24 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
           updatedAt: messageData.createdAt,
           isMine: messageData.userId === currentUserId,
         };
-        // 🔥 중복 방지: 이미 존재하는 메시지인지 확인
+        // 🔥 중복 방지: 이미 존재하는 메시지인지 확인 (ID 또는 optimistic 메시지)
         setMessages((prev) => {
+          // 동일 messageId 중복 체크
           if (prev.some((m) => m.messageId === newMessage.messageId)) {
             console.log('⚠️ [ChatPanel] 중복 메시지 무시:', newMessage.messageId);
             return prev;
+          }
+          // 🔥 Optimistic UI 메시지 대체: 내 메시지이고 같은 내용이면 temp 메시지 교체
+          if (newMessage.isMine) {
+            const tempIndex = prev.findIndex(
+              (m) => m.messageId.startsWith('temp-') && m.content === newMessage.content && m.userId === newMessage.userId
+            );
+            if (tempIndex !== -1) {
+              console.log('✅ [ChatPanel] Optimistic 메시지 대체:', prev[tempIndex].messageId, '→', newMessage.messageId);
+              const updated = [...prev];
+              updated[tempIndex] = newMessage;
+              return updated;
+            }
           }
           return [...prev, newMessage];
         });
@@ -111,8 +124,22 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
   const handleSendMessage = () => {
     if (!inputMessage.trim()) return;
 
-    const success = sendMessage(inputMessage);
+    const content = inputMessage.trim();
+    const success = sendMessage(content);
     if (success) {
+      // 🔥 Optimistic UI Update - 메시지를 즉시 UI에 표시
+      const optimisticMessage: Message = {
+        messageId: `temp-${Date.now()}`, // 임시 ID
+        chatId,
+        userId: currentUserId || '',
+        userName: '', // 본인 메시지이므로 표시 안됨
+        content,
+        messageType: 'TEXT',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isMine: true,
+      };
+      setMessages((prev) => [...prev, optimisticMessage]);
       setInputMessage('');
     }
   };

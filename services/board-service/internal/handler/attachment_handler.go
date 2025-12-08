@@ -273,7 +273,7 @@ type SaveAttachmentMetadataRequest struct {
 
 // AttachmentResponse represents the attachment metadata response
 type AttachmentResponse struct {
-	ID          uuid.UUID  `json:"id"`
+	ID          uuid.UUID  `json:"attachmentId"`
 	EntityType  string     `json:"entityType"`
 	EntityID    *uuid.UUID `json:"entityId"`
 	Status      string     `json:"status"`

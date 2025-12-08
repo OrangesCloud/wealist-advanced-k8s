@@ -1,43 +1,33 @@
-// internal/middleware/cors.go
 package middleware
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// CORS는 CORS 헤더를 설정하는 미들웨어입니다
-func CORS(allowedOrigins string) gin.HandlerFunc {
+func CORSMiddleware(allowedOrigins string) gin.HandlerFunc {
 	origins := strings.Split(allowedOrigins, ",")
-	
+	originMap := make(map[string]bool)
+	for _, origin := range origins {
+		originMap[strings.TrimSpace(origin)] = true
+	}
+
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
-		
-		// 허용된 Origin인지 확인
-		allowed := false
-		for _, allowedOrigin := range origins {
-			allowedOrigin = strings.TrimSpace(allowedOrigin)
-			if allowedOrigin == "*" || allowedOrigin == origin {
-				allowed = true
-				break
-			}
+
+		if originMap[origin] || len(origins) == 0 || (len(origins) == 1 && origins[0] == "*") {
+			c.Header("Access-Control-Allow-Origin", origin)
 		}
 
-		if allowed {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
-		} else if len(origins) > 0 && origins[0] == "*" {
-			c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		}
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Workspace-Id")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Max-Age", "86400")
 
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Accept, Origin, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
-
-		// Preflight 요청 처리
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 

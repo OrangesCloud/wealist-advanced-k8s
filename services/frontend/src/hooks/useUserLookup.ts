@@ -3,7 +3,8 @@ import { useMemo } from 'react';
 
 export interface Member {
   userId: string;
-  userName: string;
+  nickName?: string;
+  userEmail?: string;
   profileImageUrl?: string | null; // null이 올 수도 있으니 타입에 포함
 }
 
@@ -18,7 +19,8 @@ export const useUserLookup = (members: Member[] = []) => {
 
   // 2. 닉네임 가져오기
   const getNickname = (userId: string) => {
-    return userMap[userId]?.userName || userId;
+    const member = userMap[userId];
+    return member?.nickName || member?.userEmail || userId;
   };
 
   // 3. 유저 객체 가져오기

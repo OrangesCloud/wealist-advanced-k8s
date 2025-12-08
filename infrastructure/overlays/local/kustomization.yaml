@@ -1,37 +1,16 @@
-# Infrastructure - Local overlay
-# Uses StatefulSet for postgres/redis in local k8s cluster
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: wealist-dev
 
 resources:
   - ../../base
 
-namespace: wealist-local
-
-# Local development secrets (for testing only)
-secretGenerator:
-  - name: postgres-secret
-    behavior: replace
-    literals:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=localdevpassword
-      - USER_DB_NAME=userdb
-      - USER_DB_USER=userservice
-      - USER_DB_PASSWORD=localdevpassword
-      - BOARD_DB_NAME=boarddb
-      - BOARD_DB_USER=boardservice
-      - BOARD_DB_PASSWORD=localdevpassword
-  - name: redis-secret
-    behavior: replace
-    literals:
-      - REDIS_PASSWORD=localredispassword
-
-# Reduce storage for local
 patches:
-  - patch: |-
+  - target:
+      kind: Namespace
+      name: wealist
+    patch: |-
       - op: replace
-        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
-        value: 500Mi
-    target:
-      kind: StatefulSet
-      name: postgres
+        path: /metadata/name
+        value: wealist-dev

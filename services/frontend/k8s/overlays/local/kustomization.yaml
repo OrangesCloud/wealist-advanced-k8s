@@ -1,14 +1,16 @@
-# frontend - Local overlay
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: wealist-dev
 
 resources:
   - ../../base
 
-namespace: wealist-local
+images:
+  - name: frontend
+    newName: frontend
+    newTag: local
 
-patches:
-  - path: patches/deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: frontend
+replicas:
+  - name: frontend
+    count: 1

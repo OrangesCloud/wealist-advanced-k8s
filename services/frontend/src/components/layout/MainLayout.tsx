@@ -9,8 +9,11 @@ import { Sidebar } from './Sidebar';
 // import { ChatPanel } from '../chat/chatPanel';
 import { ChatListPanel } from '../chat/ChatListPanel';
 import { ChatPanel } from '../chat/ChatPanel';
+import { NotificationPanel } from '../notification/NotificationPanel';
 import { LogOut, UserIcon } from 'lucide-react';
 import { usePresence } from '../../hooks/usePresence';
+import { useNotifications } from '../../hooks/useNotifications';
+import type { Notification } from '../../types/notification';
 
 // 🔥 Render prop 타입: handleStartChat을 children에 전달
 type StartChatHandler = (member: WorkspaceMemberResponse) => Promise<void>;
@@ -21,6 +24,7 @@ interface MainLayoutProps {
   projectId?: string;
   children: React.ReactNode | ((handleStartChat: StartChatHandler) => React.ReactNode);
   onProfileModalOpen: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({
@@ -29,6 +33,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   projectId,
   children,
   onProfileModalOpen,
+  onNotificationClick,
 }) => {
   const { theme } = useTheme();
 
@@ -37,10 +42,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [chatListRefreshKey, setChatListRefreshKey] = useState(0); // 🔥 채팅 목록 갱신용
   const [totalUnreadCount, setTotalUnreadCount] = useState(0); // 🔥 총 읽지 않은 메시지 수
+
+  // 알림 훅
+  const {
+    notifications,
+    unreadCount: notificationUnreadCount,
+    isLoading: isNotificationLoading,
+    hasMore: hasMoreNotifications,
+    loadMore: loadMoreNotifications,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    removeNotification,
+  } = useNotifications({ workspaceId, enabled: true });
 
   // Ref
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -86,7 +104,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const profile = await getMyProfile();
+        const profile = await getMyProfile(workspaceId);
         setUserProfile(profile);
       } catch (e) {
         console.error('기본 프로필 로드 실패:', e);
@@ -95,7 +113,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       }
     };
     fetchUserProfile();
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => {
     refreshUnreadCount();
@@ -140,7 +158,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   const handleStartChat = async (member: WorkspaceMemberResponse) => {
     setIsLoadingChat(true);
     try {
-      console.log('🔵 채팅 시작:', member.userName);
+      console.log('🔵 채팅 시작:', member.nickName || member.userEmail);
 
       // 1. DM 채팅방 생성 또는 기존 채팅방 가져오기
       const chatId = await createOrGetDMChat(member.userId, workspaceId);
@@ -202,15 +220,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         workspaceId={workspaceId}
         userProfile={userProfile}
         isChatActive={isChatOpen}
+        isNotificationActive={isNotificationOpen}
         onChatToggle={() => {
           setIsChatOpen(!isChatOpen);
+          setIsNotificationOpen(false); // 채팅 열면 알림 닫기
           if (isChatOpen) {
             setActiveChatId(null);
           }
         }}
+        onNotificationToggle={() => {
+          setIsNotificationOpen(!isNotificationOpen);
+          setIsChatOpen(false); // 알림 열면 채팅 닫기
+          setActiveChatId(null);
+        }}
         onUserMenuToggle={() => setShowUserMenu(!showUserMenu)}
         onStartChat={handleStartChat}
         totalUnreadCount={totalUnreadCount}
+        notificationUnreadCount={notificationUnreadCount}
       />
 
       {/* 🔥 ChatPanel 또는 ChatList (왼쪽에 고정) */}
@@ -242,11 +268,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({
         </div>
       )}
 
+      {/* 알림 패널 */}
+      <NotificationPanel
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        notifications={notifications}
+        unreadCount={notificationUnreadCount}
+        isLoading={isNotificationLoading}
+        hasMore={hasMoreNotifications}
+        onLoadMore={loadMoreNotifications}
+        onMarkAsRead={markNotificationAsRead}
+        onMarkAllAsRead={markAllNotificationsAsRead}
+        onDelete={removeNotification}
+        onNotificationClick={onNotificationClick}
+      />
+
       {/* 메인 콘텐츠 영역 */}
       <main
         className="flex-grow flex flex-col relative z-10 transition-all duration-300"
         style={{
-          marginLeft: isChatOpen ? `calc(${sidebarWidth} + ${chatPanelWidth})` : sidebarWidth,
+          marginLeft: isChatOpen || isNotificationOpen ? `calc(${sidebarWidth} + ${chatPanelWidth})` : sidebarWidth,
           minHeight: '100vh',
         }}
       >

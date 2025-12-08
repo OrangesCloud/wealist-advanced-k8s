@@ -1,19 +1,25 @@
-# user-service - Local overlay (kind, k3s, minikube)
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: wealist-dev
 
 resources:
   - ../../base
 
-namespace: wealist-local
+images:
+  - name: user-service
+    newName: user-service
+    newTag: local
+
+replicas:
+  - name: user-service
+    count: 1
 
 patches:
-  - path: patches/deployment-patch.yaml
-    target:
-      kind: Deployment
-      name: user-service
-
-# Local-specific configurations
-# - Lower resource limits
-# - NodePort for local access
-# - Local image registry
+  - target:
+      kind: ConfigMap
+      name: user-service-config
+    patch: |-
+      - op: replace
+        path: /data/SPRING_PROFILES_ACTIVE
+        value: "dev"

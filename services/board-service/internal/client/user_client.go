@@ -41,6 +41,7 @@ type WorkspaceValidationResponse struct {
 	UserID      uuid.UUID `json:"userId"`
 	Valid       bool      `json:"valid"`
 	IsValid     bool      `json:"isValid"`
+	IsMember    bool      `json:"isMember"` // user-service returns this field
 }
 
 // UserProfile represents basic user profile information
@@ -211,8 +212,8 @@ func (c *userClient) ValidateWorkspaceMember(ctx context.Context, workspaceID, u
 		return false, err
 	}
 
-	// Check both Valid and IsValid fields for compatibility
-	isValid := response.Valid || response.IsValid
+	// Check Valid, IsValid, and IsMember fields for compatibility
+	isValid := response.Valid || response.IsValid || response.IsMember
 
 	c.logger.Debug("Workspace member validation result",
 		zap.Bool("is_valid", isValid),

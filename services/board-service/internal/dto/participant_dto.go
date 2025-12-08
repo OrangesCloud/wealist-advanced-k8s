@@ -41,7 +41,7 @@ type AddParticipantsResponse struct {
 // ParticipantResponse represents the participant response
 // @Description Participant information for a board
 type ParticipantResponse struct {
-	ID        uuid.UUID `json:"id" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
+	ID        uuid.UUID `json:"participantId" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
 	BoardID   uuid.UUID `json:"boardId" example:"1275eac5-f0f9-4bee-8235-576a0042f42b"`
 	UserID    uuid.UUID `json:"userId" example:"a1b2c3d4-e5f6-7890-abcd-ef1234567890"`
 	CreatedAt time.Time `json:"createdAt" example:"2024-01-15T10:30:00Z"`

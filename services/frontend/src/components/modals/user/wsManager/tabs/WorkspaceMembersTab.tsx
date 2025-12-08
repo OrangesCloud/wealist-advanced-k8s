@@ -124,23 +124,23 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
   }, [inviteSearchQuery]);
 
   /**
-   * 💡 [이름 변경] 사용자 ID를 통해 최종 초대 실행
+   * 💡 사용자 이메일을 통해 최종 초대 실행
    */
-  const handleInviteUser = async (userId: string) => {
-    if (!userId.trim()) {
-      setError('초대할 사용자의 ID를 입력해주세요.');
+  const handleInviteUser = async (email: string) => {
+    if (!email.trim()) {
+      setError('초대할 사용자의 이메일을 입력해주세요.');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      await inviteUser(workspaceId, userId);
+      await inviteUser(workspaceId, email);
       setInviteSearchQuery(''); // 검색창 초기화
       setSelectedUserId(''); // 선택된 사용자 초기화
       setSearchResults([]); // 검색 결과 초기화
       await fetchWorkspaceData();
       onDataRefreshed();
-      console.log(`사용자 ID ${userId}에 대한 초대가 완료되었습니다.`);
+      console.log(`사용자 이메일 ${email}에 대한 초대가 완료되었습니다.`);
     } catch (err: any) {
       const errorMsg = err.response?.data?.error?.message || err.message;
       setError(`회원 초대에 실패했습니다: ${errorMsg}`);
@@ -239,9 +239,9 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
     const query = memberSearchQuery.toLowerCase();
     return members.filter(
       (member) =>
-        member.userName.toLowerCase().includes(query) ||
-        member.userEmail.toLowerCase().includes(query) ||
-        member.roleName.toLowerCase().includes(query),
+        (member.nickName || '').toLowerCase().includes(query) ||
+        (member.userEmail || '').toLowerCase().includes(query) ||
+        (member.roleName || '').toLowerCase().includes(query),
     );
   }, [members, memberSearchQuery]);
 
@@ -294,17 +294,17 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
           >
             {searchResults.map((user) => (
               <div
-                key={user.id}
+                key={user.userId}
                 onClick={() => {
-                  setSelectedUserId(user.id);
-                  setInviteSearchQuery(user.id); // 선택된 ID로 검색창 업데이트 (선택 완료 시)
+                  setSelectedUserId(user.userId);
+                  setInviteSearchQuery(user.userId); // 선택된 ID로 검색창 업데이트 (선택 완료 시)
                   setSearchResults([]); // 드롭다운 닫기
                 }}
                 className={`p-3 cursor-pointer hover:bg-gray-100 ${
-                  selectedUserId === user.id ? 'bg-blue-50' : ''
+                  selectedUserId === user.userId ? 'bg-blue-50' : ''
                 }`}
               >
-                <p className="text-sm font-medium">{user.userName}</p>
+                <p className="text-sm font-medium">{user.nickName}</p>
                 <p className="text-xs text-gray-500">{user.userEmail}</p>
               </div>
             ))}
@@ -321,11 +321,11 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
           <div className="space-y-2">
             {pendingMembers?.map((member) => (
               <div
-                key={member.id}
+                key={member.joinRequestId}
                 className="flex items-center justify-between bg-gray-50 p-3 rounded border border-gray-200"
               >
                 <div>
-                  <p className="text-sm font-medium text-gray-700">{member.userName}</p>
+                  <p className="text-sm font-medium text-gray-700">{member.nickName}</p>
                   <p className="text-xs text-gray-500">{member.userEmail}</p>
                 </div>
                 <div className="flex gap-2">
@@ -373,12 +373,12 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
         <div className="space-y-2">
           {filteredMembers?.map((member) => (
             <div
-              key={member?.id}
+              key={member?.workspaceMemberId}
               className="flex items-center justify-between bg-gray-50 p-3 rounded border border-gray-200"
             >
               <div>
                 <p className="text-sm font-medium text-gray-700">
-                  {member?.userName}{' '}
+                  {member?.nickName}{' '}
                   <span className="text-xs text-blue-600 font-semibold">({member?.roleName})</span>
                 </p>
                 <p className="text-xs text-gray-500">{member?.userEmail}</p>
@@ -388,7 +388,7 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
                 <div className="flex gap-2">
                   {member?.roleName === 'MEMBER' && (
                     <button
-                      onClick={() => handleUpdateRole(member?.id, member?.roleName, 'ADMIN')}
+                      onClick={() => handleUpdateRole(member?.workspaceMemberId, member?.roleName, 'ADMIN')}
                       disabled={displayLoading}
                       className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition disabled:opacity-50"
                     >
@@ -397,7 +397,7 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
                   )}
                   {member?.roleName === 'ADMIN' && (
                     <button
-                      onClick={() => handleUpdateRole(member?.id, member?.roleName, 'MEMBER')}
+                      onClick={() => handleUpdateRole(member?.workspaceMemberId, member?.roleName, 'MEMBER')}
                       disabled={displayLoading}
                       className="px-3 py-1 bg-gray-500 text-white text-xs rounded hover:bg-gray-600 transition disabled:opacity-50"
                     >
@@ -405,7 +405,7 @@ export const WorkspaceMembersTab: React.FC<WorkspaceMembersTabProps> = ({
                     </button>
                   )}
                   <button
-                    onClick={() => handleRemoveMember(member?.id, member?.userName)}
+                    onClick={() => handleRemoveMember(member?.workspaceMemberId, member?.nickName)}
                     disabled={displayLoading}
                     className="px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition disabled:opacity-50"
                   >

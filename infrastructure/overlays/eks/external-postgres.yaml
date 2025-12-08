@@ -1,5 +1,4 @@
-# External PostgreSQL Service (AWS RDS)
-# ExternalName service to connect to RDS
+# ExternalName service pointing to RDS
 apiVersion: v1
 kind: Service
 metadata:
@@ -8,23 +7,6 @@ metadata:
     app: postgres
 spec:
   type: ExternalName
-  externalName: YOUR_RDS_ENDPOINT.rds.amazonaws.com  # TODO: Update with actual RDS endpoint
----
-# TODO: Use External Secrets Operator with Vault
-# Example ExternalSecret CRD (requires external-secrets operator)
-# apiVersion: external-secrets.io/v1beta1
-# kind: ExternalSecret
-# metadata:
-#   name: postgres-secret
-# spec:
-#   refreshInterval: 1h
-#   secretStoreRef:
-#     name: vault-backend
-#     kind: ClusterSecretStore
-#   target:
-#     name: postgres-secret
-#   data:
-#     - secretKey: POSTGRES_PASSWORD
-#       remoteRef:
-#         key: secret/data/wealist/postgres
-#         property: password
+  externalName: ${RDS_ENDPOINT}
+  ports:
+    - port: 5432

@@ -1,20 +1,17 @@
-# Infrastructure Application (postgres, redis)
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: wealist-infrastructure
   namespace: argocd
-  finalizers:
-    - resources-finalizer.argocd.argoproj.io
 spec:
   project: wealist
   source:
-    repoURL: https://github.com/YOUR_ORG/wealist-project-advanced.git  # TODO: Update
-    targetRevision: HEAD
-    path: infrastructure/overlays/eks  # Change to 'local' for local env
+    repoURL: https://github.com/your-org/wealist-project-advanced.git
+    targetRevision: main
+    path: infrastructure/overlays/local
   destination:
     server: https://kubernetes.default.svc
-    namespace: wealist
+    namespace: wealist-dev
   syncPolicy:
     automated:
       prune: true

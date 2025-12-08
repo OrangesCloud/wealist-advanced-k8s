@@ -12,15 +12,16 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Logger   LoggerConfig   `yaml:"logger"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	UserAPI  UserAPIConfig  `yaml:"user_api"`
-	AuthAPI  AuthAPIConfig  `yaml:"auth_api"` // auth-service for token validation
-	CORS     CORSConfig     `yaml:"cors"`
-	Redis    RedisConfig    `mapstructure:"redis" yaml:"redis"` // ← Redis 추가
-	S3       S3Config       `yaml:"s3"`                          // ← S3 추가
+	Server          ServerConfig          `yaml:"server"`
+	Database        DatabaseConfig        `yaml:"database"`
+	Logger          LoggerConfig          `yaml:"logger"`
+	JWT             JWTConfig             `yaml:"jwt"`
+	UserAPI         UserAPIConfig         `yaml:"user_api"`
+	AuthAPI         AuthAPIConfig         `yaml:"auth_api"`                   // auth-service for token validation
+	NotificationAPI NotificationAPIConfig `yaml:"notification_api"`           // notification-service
+	CORS            CORSConfig            `yaml:"cors"`
+	Redis           RedisConfig           `mapstructure:"redis" yaml:"redis"` // ← Redis 추가
+	S3              S3Config              `yaml:"s3"`                          // ← S3 추가
 }
 
 // ServerConfig holds server configuration
@@ -69,6 +70,14 @@ type AuthAPIConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 }
 
+// NotificationAPIConfig holds Notification Service configuration
+type NotificationAPIConfig struct {
+	BaseURL string        `yaml:"base_url"`
+	APIKey  string        `yaml:"api_key"`
+	Timeout time.Duration `yaml:"timeout"`
+	Enabled bool          `yaml:"enabled"`
+}
+
 // CORSConfig holds CORS configuration
 type CORSConfig struct {
 	AllowedOrigins string `yaml:"allowed_origins"`
@@ -83,11 +92,12 @@ type RedisConfig struct {
 
 // S3Config holds S3 configuration
 type S3Config struct {
-	Bucket    string `yaml:"bucket"`
-	Region    string `yaml:"region"`
-	AccessKey string `yaml:"access_key"` // MinIO용만 필요 (선택적)
-	SecretKey string `yaml:"secret_key"` // MinIO용만 필요 (선택적)
-	Endpoint  string `yaml:"endpoint"`   // 로컬 MinIO용 (선택적)
+	Bucket         string `yaml:"bucket"`
+	Region         string `yaml:"region"`
+	AccessKey      string `yaml:"access_key"`      // MinIO용만 필요 (선택적)
+	SecretKey      string `yaml:"secret_key"`      // MinIO용만 필요 (선택적)
+	Endpoint       string `yaml:"endpoint"`        // 로컬 MinIO용 - 서비스 간 통신 (선택적)
+	PublicEndpoint string `yaml:"public_endpoint"` // 브라우저 접근용 공개 URL (선택적)
 }
 
 // Load loads configuration from file and environment variables
@@ -154,6 +164,12 @@ func getDefaultConfig() Config {
 		AuthAPI: AuthAPIConfig{
 			BaseURL: "http://localhost:8090",
 			Timeout: 5 * time.Second,
+		},
+		NotificationAPI: NotificationAPIConfig{
+			BaseURL: "http://localhost:8002",
+			APIKey:  "internal-secret-key",
+			Timeout: 5 * time.Second,
+			Enabled: true,
 		},
 		CORS: CORSConfig{
 			AllowedOrigins: "*",
@@ -267,6 +283,23 @@ func (c *Config) overrideFromEnv() {
 		}
 	}
 
+	// Notification API
+	if baseURL := os.Getenv("NOTI_SERVICE_URL"); baseURL != "" {
+		c.NotificationAPI.BaseURL = baseURL
+	}
+	if apiKey := os.Getenv("INTERNAL_API_KEY"); apiKey != "" {
+		c.NotificationAPI.APIKey = apiKey
+	}
+	if timeout := os.Getenv("NOTI_API_TIMEOUT"); timeout != "" {
+		if d, err := time.ParseDuration(timeout); err == nil {
+			c.NotificationAPI.Timeout = d
+		}
+	}
+	// Default to enabled, can be disabled with NOTI_ENABLED=false
+	if enabled := os.Getenv("NOTI_ENABLED"); enabled == "false" {
+		c.NotificationAPI.Enabled = false
+	}
+
 	// CORS - CORS_ORIGINS alias (original format takes precedence)
 	if origins := os.Getenv("CORS_ORIGINS"); origins != "" {
 		c.CORS.AllowedOrigins = origins
@@ -299,6 +332,9 @@ func (c *Config) overrideFromEnv() {
 	}
 	if s3Endpoint := os.Getenv("S3_ENDPOINT"); s3Endpoint != "" {
 		c.S3.Endpoint = s3Endpoint
+	}
+	if s3PublicEndpoint := os.Getenv("S3_PUBLIC_ENDPOINT"); s3PublicEndpoint != "" {
+		c.S3.PublicEndpoint = s3PublicEndpoint
 	}
 }
 

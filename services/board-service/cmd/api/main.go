@@ -129,12 +129,31 @@ func main() {
 		zap.String("auth_api_url", cfg.AuthAPI.BaseURL),
 	)
 
+	// Initialize Notification Client
+	var notificationClient client.NotificationClient
+	if cfg.NotificationAPI.Enabled {
+		notificationClient = client.NewNotificationClient(
+			cfg.NotificationAPI.BaseURL,
+			cfg.NotificationAPI.APIKey,
+			cfg.NotificationAPI.Timeout,
+			logger,
+			m,
+		)
+		logger.Info("Notification client initialized",
+			zap.String("notification_api_url", cfg.NotificationAPI.BaseURL),
+		)
+	} else {
+		notificationClient = client.NewNoOpNotificationClient()
+		logger.Info("Notification client disabled (using no-op client)")
+	}
+
 	// Setup router with all dependencies
 	r := router.Setup(router.Config{
 		DB:                 db,
 		Logger:             logger,
 		JWTSecret:          cfg.JWT.Secret,
 		UserClient:         userClient,
+		NotificationClient: notificationClient,
 		BasePath:           cfg.Server.BasePath,
 		UserServiceBaseURL: cfg.UserAPI.BaseURL,
 		Metrics:            m,

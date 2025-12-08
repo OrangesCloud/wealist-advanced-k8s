@@ -1,114 +1,138 @@
 package repository
 
 import (
-	"chat-service/internal/model"
+	"chat-service/internal/domain"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type ChatRepository interface {
-	CreateChat(chat *model.Chat) error
-	GetChatByID(chatID uuid.UUID) (*model.Chat, error)
-	GetChatsByWorkspace(workspaceID uuid.UUID) ([]model.Chat, error)
-	GetChatsByUser(userID uuid.UUID) ([]model.Chat, error)
-	UpdateChat(chat *model.Chat) error
-	DeleteChat(chatID uuid.UUID) error
-	
-	AddParticipant(participant *model.ChatParticipant) error
-	RemoveParticipant(chatID, userID uuid.UUID) error
-	GetParticipants(chatID uuid.UUID) ([]model.ChatParticipant, error)
-	IsParticipant(chatID, userID uuid.UUID) (bool, error)
-	UpdateLastRead(chatID, userID uuid.UUID) error
-}
-
-type chatRepository struct {
+type ChatRepository struct {
 	db *gorm.DB
 }
 
-func NewChatRepository(db *gorm.DB) ChatRepository {
-	return &chatRepository{db: db}
+func NewChatRepository(db *gorm.DB) *ChatRepository {
+	return &ChatRepository{db: db}
 }
 
-func (r *chatRepository) CreateChat(chat *model.Chat) error {
+func (r *ChatRepository) Create(chat *domain.Chat) error {
 	return r.db.Create(chat).Error
 }
 
-func (r *chatRepository) GetChatByID(chatID uuid.UUID) (*model.Chat, error) {
-	var chat model.Chat
-	err := r.db.Preload("Participants").
-		Preload("Messages", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC").Limit(50)
-		}).
-		First(&chat, "chat_id = ?", chatID).Error
-	
+func (r *ChatRepository) GetByID(id uuid.UUID) (*domain.Chat, error) {
+	var chat domain.Chat
+	err := r.db.Preload("Participants", "is_active = ?", true).
+		First(&chat, "id = ? AND deleted_at IS NULL", id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &chat, nil
 }
 
-func (r *chatRepository) GetChatsByWorkspace(workspaceID uuid.UUID) ([]model.Chat, error) {
-	var chats []model.Chat
-	err := r.db.Preload("Participants").
-		Where("workspace_id = ?", workspaceID).
-		Order("updated_at DESC").
-		Find(&chats).Error
-	
-	return chats, err
-}
+func (r *ChatRepository) GetUserChats(userID uuid.UUID) ([]domain.ChatWithUnread, error) {
+	var chats []domain.Chat
 
-func (r *chatRepository) GetChatsByUser(userID uuid.UUID) ([]model.Chat, error) {
-	var chats []model.Chat
-	
 	err := r.db.
-		Joins("JOIN chat_participants ON chat_participants.chat_id = chats.chat_id").
-		Where("chat_participants.user_id = ? AND chat_participants.is_active = true", userID).
-		Preload("Participants").
+		Joins("JOIN chat_participants ON chats.id = chat_participants.chat_id").
+		Where("chat_participants.user_id = ? AND chat_participants.is_active = ? AND chats.deleted_at IS NULL", userID, true).
+		Preload("Participants", "is_active = ?", true).
 		Order("chats.updated_at DESC").
 		Find(&chats).Error
-	
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Calculate unread count for each chat
+	result := make([]domain.ChatWithUnread, len(chats))
+	for i, chat := range chats {
+		result[i].Chat = chat
+
+		// Get participant's last read time
+		var participant domain.ChatParticipant
+		r.db.Where("chat_id = ? AND user_id = ? AND is_active = ?", chat.ID, userID, true).First(&participant)
+
+		// Count unread messages
+		query := r.db.Model(&domain.Message{}).
+			Where("chat_id = ? AND deleted_at IS NULL AND user_id != ?", chat.ID, userID)
+
+		if participant.LastReadAt != nil {
+			query = query.Where("created_at > ?", participant.LastReadAt)
+		}
+
+		query.Count(&result[i].UnreadCount)
+	}
+
+	return result, nil
+}
+
+func (r *ChatRepository) GetWorkspaceChats(workspaceID uuid.UUID) ([]domain.Chat, error) {
+	var chats []domain.Chat
+	err := r.db.
+		Where("workspace_id = ? AND deleted_at IS NULL", workspaceID).
+		Preload("Participants", "is_active = ?", true).
+		Order("updated_at DESC").
+		Find(&chats).Error
 	return chats, err
 }
 
-func (r *chatRepository) UpdateChat(chat *model.Chat) error {
-	return r.db.Save(chat).Error
+func (r *ChatRepository) SoftDelete(id uuid.UUID) error {
+	now := time.Now()
+	return r.db.Model(&domain.Chat{}).
+		Where("id = ?", id).
+		Update("deleted_at", now).Error
 }
 
-func (r *chatRepository) DeleteChat(chatID uuid.UUID) error {
-	return r.db.Delete(&model.Chat{}, "chat_id = ?", chatID).Error
+func (r *ChatRepository) UpdateTimestamp(id uuid.UUID) error {
+	return r.db.Model(&domain.Chat{}).
+		Where("id = ?", id).
+		Update("updated_at", time.Now()).Error
 }
 
-func (r *chatRepository) AddParticipant(participant *model.ChatParticipant) error {
-	return r.db.Create(participant).Error
+func (r *ChatRepository) AddParticipant(participant *domain.ChatParticipant) error {
+	// Upsert: reactivate if exists, create if not
+	return r.db.Exec(`
+		INSERT INTO chat_participants (id, chat_id, user_id, joined_at, is_active)
+		VALUES (?, ?, ?, ?, true)
+		ON CONFLICT (chat_id, user_id) WHERE is_active = true
+		DO UPDATE SET is_active = true, joined_at = EXCLUDED.joined_at
+	`, uuid.New(), participant.ChatID, participant.UserID, time.Now()).Error
 }
 
-func (r *chatRepository) RemoveParticipant(chatID, userID uuid.UUID) error {
-	return r.db.Model(&model.ChatParticipant{}).
+func (r *ChatRepository) AddParticipants(chatID uuid.UUID, userIDs []uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, userID := range userIDs {
+			err := tx.Exec(`
+				INSERT INTO chat_participants (id, chat_id, user_id, joined_at, is_active)
+				VALUES (?, ?, ?, ?, true)
+				ON CONFLICT (chat_id, user_id) WHERE is_active = true
+				DO UPDATE SET is_active = true
+			`, uuid.New(), chatID, userID, time.Now()).Error
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *ChatRepository) RemoveParticipant(chatID, userID uuid.UUID) error {
+	return r.db.Model(&domain.ChatParticipant{}).
 		Where("chat_id = ? AND user_id = ?", chatID, userID).
 		Update("is_active", false).Error
 }
 
-func (r *chatRepository) GetParticipants(chatID uuid.UUID) ([]model.ChatParticipant, error) {
-	var participants []model.ChatParticipant
-	err := r.db.Where("chat_id = ? AND is_active = true", chatID).
-		Find(&participants).Error
-	
-	return participants, err
-}
-
-func (r *chatRepository) IsParticipant(chatID, userID uuid.UUID) (bool, error) {
+func (r *ChatRepository) IsUserInChat(chatID, userID uuid.UUID) (bool, error) {
 	var count int64
-	err := r.db.Model(&model.ChatParticipant{}).
-		Where("chat_id = ? AND user_id = ? AND is_active = true", chatID, userID).
+	err := r.db.Model(&domain.ChatParticipant{}).
+		Where("chat_id = ? AND user_id = ? AND is_active = ?", chatID, userID, true).
 		Count(&count).Error
-	
 	return count > 0, err
 }
 
-func (r *chatRepository) UpdateLastRead(chatID, userID uuid.UUID) error {
-	return r.db.Model(&model.ChatParticipant{}).
-		Where("chat_id = ? AND user_id = ?", chatID, userID).
+func (r *ChatRepository) UpdateLastReadAt(chatID, userID uuid.UUID) error {
+	return r.db.Model(&domain.ChatParticipant{}).
+		Where("chat_id = ? AND user_id = ? AND is_active = ?", chatID, userID, true).
 		Update("last_read_at", time.Now()).Error
 }
