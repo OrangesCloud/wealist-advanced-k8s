@@ -217,7 +217,7 @@ func TestPerformance_MetricsEndpointResponseTime(t *testing.T) {
 	iterations := 100
 	var totalDuration time.Duration
 	var maxDuration time.Duration
-	var minDuration time.Duration = time.Hour
+	var minDuration = time.Hour
 
 	for i := 0; i < iterations; i++ {
 		req := httptest.NewRequest("GET", "/metrics", nil)
@@ -389,7 +389,7 @@ func TestPerformance_ConcurrentMetricsCollection(t *testing.T) {
 	// Use isolated registry to avoid conflicts
 	registry := prometheus.NewRegistry()
 	testMetrics := NewWithRegistry(registry, nil)
-	
+
 	// Number of concurrent goroutines
 	concurrency := 100
 	iterationsPerGoroutine := 1000

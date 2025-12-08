@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,7 +15,7 @@ import (
 	"project-board-api/internal/metrics"
 )
 
-// 💡 [추가] WebSocket 인증 응답 DTO
+// TokenValidationResponse represents the response from token validation for WebSocket authentication.
 type TokenValidationResponse struct {
 	UserID  string `json:"userId"`
 	Valid   bool   `json:"valid"`
@@ -41,7 +40,6 @@ type WorkspaceValidationResponse struct {
 	UserID      uuid.UUID `json:"userId"`
 	Valid       bool      `json:"valid"`
 	IsValid     bool      `json:"isValid"`
-	IsMember    bool      `json:"isMember"` // user-service returns this field
 }
 
 // UserProfile represents basic user profile information
@@ -75,20 +73,17 @@ type Workspace struct {
 
 // userClient implements UserClient interface
 type userClient struct {
-	baseURL     string
-	authBaseURL string // auth-service URL for token validation
-	httpClient  *http.Client
-	timeout     time.Duration
-	logger      *zap.Logger
-	metrics     *metrics.Metrics
+	baseURL    string
+	httpClient *http.Client
+	timeout    time.Duration
+	logger     *zap.Logger
+	metrics    *metrics.Metrics
 }
 
 // NewUserClient creates a new User API client
-// authBaseURL: auth-service URL for token validation (블랙리스트 체크 포함)
-func NewUserClient(baseURL string, authBaseURL string, timeout time.Duration, logger *zap.Logger, m *metrics.Metrics) UserClient {
+func NewUserClient(baseURL string, timeout time.Duration, logger *zap.Logger, m *metrics.Metrics) UserClient {
 	return &userClient{
-		baseURL:     baseURL,
-		authBaseURL: authBaseURL,
+		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -98,26 +93,16 @@ func NewUserClient(baseURL string, authBaseURL string, timeout time.Duration, lo
 	}
 }
 
-// ValidateToken은 auth-service를 호출하여 토큰 검증 (블랙리스트 체크 포함)
+// 💡 [추가] ValidateToken 메서드 구현 (WebSocket 인증 로직)
 func (c *userClient) ValidateToken(ctx context.Context, tokenStr string) (uuid.UUID, error) {
-	// auth-service의 /api/auth/validate 엔드포인트 호출
-	url := fmt.Sprintf("%s/api/auth/validate", c.authBaseURL)
+	// 쿼리 파라미터로 토큰 전달
+	url := fmt.Sprintf("%s/api/auth/validate-access-token?token=%s", c.baseURL, tokenStr)
 
-	// Request body 생성
-	reqBody := map[string]string{"token": tokenStr}
-	jsonBody, err := json.Marshal(reqBody)
-	if err != nil {
-		c.logger.Error("Failed to marshal request body", zap.Error(err))
-		return uuid.Nil, fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		c.logger.Error("Failed to create validation request", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -152,6 +137,7 @@ func (c *userClient) ValidateToken(ctx context.Context, tokenStr string) (uuid.U
 
 	return userID, nil
 }
+
 // buildURL constructs the full URL for User Service API calls
 // It intelligently handles base URLs that may or may not include context path
 //
@@ -212,8 +198,8 @@ func (c *userClient) ValidateWorkspaceMember(ctx context.Context, workspaceID, u
 		return false, err
 	}
 
-	// Check Valid, IsValid, and IsMember fields for compatibility
-	isValid := response.Valid || response.IsValid || response.IsMember
+	// Check both Valid and IsValid fields for compatibility
+	isValid := response.Valid || response.IsValid
 
 	c.logger.Debug("Workspace member validation result",
 		zap.Bool("is_valid", isValid),
@@ -357,7 +343,7 @@ func (c *userClient) doRequest(ctx context.Context, method, url, token string, r
 	// Execute request
 	resp, err := c.httpClient.Do(req)
 	duration := time.Since(startTime)
-	
+
 	// Record metrics
 	statusCode := 0
 	if resp != nil {
@@ -366,7 +352,7 @@ func (c *userClient) doRequest(ctx context.Context, method, url, token string, r
 	if c.metrics != nil {
 		c.metrics.RecordExternalAPICall(url, method, statusCode, duration, err)
 	}
-	
+
 	if err != nil {
 		c.logger.Error("Failed to execute HTTP request",
 			zap.Error(err),

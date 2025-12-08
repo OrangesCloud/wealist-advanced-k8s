@@ -1,15 +1,20 @@
+// Package router provides HTTP routing configuration.
 package router
 
 import (
+	"context"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	// swaggerFiles "github.com/swaggo/files"
-	// ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"project-board-api/internal/client"
 	"project-board-api/internal/converter"
+	"project-board-api/internal/database"
 	"project-board-api/internal/handler"
 	"project-board-api/internal/metrics"
 	"project-board-api/internal/middleware"
@@ -22,14 +27,13 @@ type Config struct {
 	Logger             *zap.Logger
 	JWTSecret          string
 	UserClient         client.UserClient
-	NotificationClient client.NotificationClient
 	BasePath           string
 	UserServiceBaseURL string
 	Metrics            *metrics.Metrics
 	S3Client           *client.S3Client
 }
 
-// Setup initializes the router with all dependencies and routes
+// Setup initializes the router with all dependencies and routes.
 func Setup(cfg Config) *gin.Engine {
 	// Create Gin router
 	router := gin.New()
@@ -61,9 +65,9 @@ func Setup(cfg Config) *gin.Engine {
 
 	// Initialize services with repository dependencies
 	projectService := service.NewProjectService(projectRepo, fieldOptionRepo, attachmentRepo, cfg.S3Client, cfg.UserClient, cfg.Metrics, cfg.Logger)
-	boardService := service.NewBoardService(boardRepo, projectRepo, fieldOptionRepo, participantRepo, attachmentRepo, cfg.S3Client, fieldOptionConverter, cfg.NotificationClient, cfg.Metrics, cfg.Logger)
+	boardService := service.NewBoardService(boardRepo, projectRepo, fieldOptionRepo, participantRepo, attachmentRepo, cfg.S3Client, fieldOptionConverter, cfg.Metrics, cfg.Logger)
 	participantService := service.NewParticipantService(participantRepo, boardRepo)
-	commentService := service.NewCommentService(commentRepo, boardRepo, projectRepo, attachmentRepo, cfg.S3Client, cfg.NotificationClient, cfg.Logger)
+	commentService := service.NewCommentService(commentRepo, boardRepo, attachmentRepo, cfg.S3Client, cfg.Logger)
 	fieldOptionService := service.NewFieldOptionService(fieldOptionRepo)
 	projectMemberService := service.NewProjectMemberService(projectRepo, cfg.UserClient)
 	projectJoinRequestService := service.NewProjectJoinRequestService(projectRepo, cfg.UserClient)
@@ -91,14 +95,11 @@ func Setup(cfg Config) *gin.Engine {
 		cfg.Logger.Info("No base path configured, using root path")
 	}
 
-	// Health check endpoints (Kubernetes probe 호환)
-	// /health - liveness probe: 서비스 자체가 살아있는지만 체크 (DB 연결 무관)
-	baseGroup.GET("/health", livenessHandler())
-	// /ready - readiness probe: DB 연결 상태까지 체크
-	baseGroup.GET("/ready", readinessHandler(cfg.DB))
+	// Health check endpoint
+	baseGroup.GET("/health", healthCheckHandler(cfg.DB))
 
-	// Swagger documentation endpoint (disabled for faster builds)
-	// baseGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger documentation endpoint
+	baseGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Metrics endpoint (no authentication required)
 	// Add metrics endpoint at root level for compatibility
@@ -114,8 +115,8 @@ func Setup(cfg Config) *gin.Engine {
 		cfg.Logger.Info("Metrics endpoint configured at root path", zap.String("path", "/metrics"))
 	}
 
-	// Setup API routes (UserClient enables auth-service token validation with blacklist check)
-	setupRoutes(baseGroup, cfg.JWTSecret, cfg.UserClient, projectHandler, boardHandler, participantHandler, commentHandler, fieldOptionHandler, projectMemberHandler, projectJoinRequestHandler, attachmentHandler)
+	// Setup API routes
+	setupRoutes(baseGroup, cfg.JWTSecret, projectHandler, boardHandler, participantHandler, commentHandler, fieldOptionHandler, projectMemberHandler, projectJoinRequestHandler, attachmentHandler)
 
 	// 🔥 [중요] WebSocket은 baseGroup을 사용하되 인증 미들웨어 없이 직접 등록
 	// basePath가 /api/boards일 때: /api/boards/api/ws/project/:projectId
@@ -125,37 +126,16 @@ func Setup(cfg Config) *gin.Engine {
 	return router
 }
 
-// livenessHandler returns a handler for liveness probe
-// 서비스 자체가 살아있는지만 체크 (DB 연결 상태와 무관)
-// EKS에서 DB 연결 실패해도 pod가 죽지 않도록 함
-func livenessHandler() gin.HandlerFunc {
+// healthCheckHandler returns a handler for the health check endpoint
+func healthCheckHandler(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "healthy",
-			"service": "board-service",
-		})
-	}
-}
-
-// readinessHandler returns a handler for readiness probe
-// DB 연결 상태까지 체크하여 트래픽 수신 가능 여부 판단
-func readinessHandler(db *gorm.DB) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// DB가 nil이면 아직 연결 안 됨
-		if db == nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
-				"database": "not_initialized",
-				"error":    "database connection not established yet",
-			})
-			return
-		}
+		checks := gin.H{}
 
 		// Check database connection
 		sqlDB, err := db.DB()
 		if err != nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
+			c.JSON(500, gin.H{
+				"status":   "unhealthy",
 				"database": "error",
 				"error":    err.Error(),
 			})
@@ -163,17 +143,33 @@ func readinessHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		if err := sqlDB.Ping(); err != nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
+			c.JSON(500, gin.H{
+				"status":   "unhealthy",
 				"database": "disconnected",
 				"error":    err.Error(),
 			})
 			return
 		}
+		checks["database"] = "connected"
+
+		// Check Redis connection
+		redisClient := database.GetRedis()
+		if redisClient != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			if err := redisClient.Ping(ctx).Err(); err != nil {
+				checks["redis"] = "disconnected - " + err.Error()
+			} else {
+				checks["redis"] = "connected"
+			}
+		} else {
+			checks["redis"] = "not_configured"
+		}
 
 		c.JSON(200, gin.H{
-			"status":   "ready",
-			"database": "connected",
+			"status": "healthy",
+			"checks": checks,
 		})
 	}
 }
@@ -182,7 +178,6 @@ func readinessHandler(db *gorm.DB) gin.HandlerFunc {
 func setupRoutes(
 	baseGroup *gin.RouterGroup,
 	jwtSecret string,
-	userClient client.UserClient,
 	projectHandler *handler.ProjectHandler,
 	boardHandler *handler.BoardHandler,
 	participantHandler *handler.ParticipantHandler,
@@ -192,9 +187,9 @@ func setupRoutes(
 	projectJoinRequestHandler *handler.ProjectJoinRequestHandler,
 	attachmentHandler *handler.AttachmentHandler,
 ) {
-	// API group with authentication via auth-service (includes blacklist check)
+	// API group with authentication
 	api := baseGroup.Group("/api")
-	api.Use(middleware.AuthWithValidator(userClient))
+	api.Use(middleware.Auth(jwtSecret))
 	{
 		// Project routes
 		projects := api.Group("/projects")
