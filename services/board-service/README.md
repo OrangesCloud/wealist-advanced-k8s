@@ -37,38 +37,70 @@ weAlist의 **보드 관리 마이크로서비스**로, 프로젝트 및 칸반 �
 
 ### 1. 사전 요구사항
 
-- Go 1.25 이상
-- Docker & Docker Compose
-- PostgreSQL 17 (로컬 실행 시)
+- Docker & Docker Compose (필수)
+- Go 1.25 이상 (로컬 실행 시)
 
 ### 2. 환경 설정
 
 ```bash
-# 환경 변수 복사
-cp .env.example .env
+# 환경 변수 파일 복사
+cp docker/env/.env.dev.example docker/env/.env.dev
 
-# 필수 환경 변수 설정
+# 필요시 환경 변수 수정
 # - DATABASE_URL: PostgreSQL 연결 문자열
 # - SECRET_KEY: JWT 서명 키 (최소 64바이트)
-# - USER_SERVICE_URL: User Service 엔드포인트
+# - USER_SERVICE_URL: User Service 엔드포인트 (독립 실행 시 생략 가능)
 ```
 
 ### 3. 실행 방법
 
-#### Docker Compose (권장)
+#### Docker Compose - 독립 개발 환경 (권장)
+
+board-service를 user-service 없이 독립적으로 실행합니다. Kubernetes Pod 환경을 시뮬레이션합니다.
 
 ```bash
-# 전체 서비스 시작 (PostgreSQL, Redis 포함)
-docker-compose up -d
+# 개발 환경 시작 (board-service + PostgreSQL + Redis + MinIO)
+docker compose -f docker/compose/docker-compose.dev.yml up -d
 
 # 로그 확인
-docker-compose logs -f board-service
+docker compose -f docker/compose/docker-compose.dev.yml logs -f board-service
 
 # 서비스 중지
-docker-compose down
+docker compose -f docker/compose/docker-compose.dev.yml down
+
+# 볼륨 포함 완전 삭제
+docker compose -f docker/compose/docker-compose.dev.yml down -v
 ```
 
-#### 로컬 실행
+**포트 접근:**
+- Board Service API: http://localhost:8000
+- PostgreSQL: localhost:5432
+- Redis: localhost:6379
+- MinIO API: http://localhost:9000
+- MinIO Console: http://localhost:9001
+
+**특징:**
+- ✅ user-service 의존성 없음
+- ✅ 모든 포트 직접 노출
+- ✅ 빠른 시작 (60초 이내)
+- ✅ 독립적인 개발 및 테스트
+
+#### Docker Compose - 통합 환경
+
+user-service와 함께 전체 스택을 실행합니다.
+
+```bash
+# 전체 서비스 시작 (user-service + board-service + nginx)
+docker compose -f docker/compose/docker-compose.yml up -d
+
+# 로그 확인
+docker compose logs -f board-service
+
+# 서비스 중지
+docker compose down
+```
+
+#### 로컬 실행 (Go 직접 실행)
 
 ```bash
 # 의존성 설치
@@ -224,6 +256,37 @@ board-service/
 > 자세한 내용은 [ARCHITECTURE.md](ARCHITECTURE.md) 참조
 
 ## 개발 가이드
+
+### 독립 개발 워크플로우
+
+board-service는 user-service 없이 독립적으로 개발할 수 있습니다.
+
+```bash
+# 1. 개발 환경 시작
+docker compose -f docker/compose/docker-compose.dev.yml up -d
+
+# 2. Health check 확인
+curl http://localhost:8000/health
+
+# 3. 코드 수정 후 재빌드
+docker compose -f docker/compose/docker-compose.dev.yml up -d --build board-service
+
+# 4. 로그 실시간 확인
+docker compose -f docker/compose/docker-compose.dev.yml logs -f board-service
+
+# 5. 테스트 실행
+go test ./...
+
+# 6. 개발 완료 후 정리
+docker compose -f docker/compose/docker-compose.dev.yml down
+```
+
+**주요 특징:**
+- ✅ user-service 의존성 없음 - 독립적 개발 가능
+- ✅ 빠른 시작 - 60초 이내 모든 서비스 준비
+- ✅ 직접 포트 접근 - nginx 없이 API 직접 호출
+- ✅ 데이터베이스 직접 접근 - psql, Redis CLI 사용 가능
+- ✅ Kubernetes 환경 시뮬레이션 - Pod 독립성 테스트
 
 ### 사용 가능한 명령어
 
@@ -405,44 +468,58 @@ weAlist는 **3가지 배포 환경**을 지원합니다:
 
 ---
 
-### 1. Local 개발 환경
+### 1. Local 개발 환경 (Standalone)
 
-**목적**: 로컬 머신에서 빠른 개발 및 디버깅
+**목적**: 로컬 머신에서 board-service 독립 개발 및 디버깅
+
+**특징**:
+- ✅ user-service 의존성 없음
+- ✅ Kubernetes Pod 환경 시뮬레이션
+- ✅ 빠른 시작 (60초 이내)
+- ✅ 모든 포트 직접 노출
 
 ```bash
 # 프로젝트 루트에서
-cd /Users/ress/my-file/tech-up/project/basic_project/wealist-project
+cd board-service
 
-# 전체 서비스 시작 (User Service + Board Service + PostgreSQL + Redis)
-./docker/scripts/dev.sh up
-
-# 개별 서비스 재시작
-docker-compose restart board-service
+# 독립 개발 환경 시작 (board-service + PostgreSQL + Redis + MinIO)
+docker compose -f docker/compose/docker-compose.dev.yml up -d
 
 # 로그 확인
-./docker/scripts/dev.sh logs board-service
+docker compose -f docker/compose/docker-compose.dev.yml logs -f board-service
 
 # 서비스 중지
-./docker/scripts/dev.sh down
+docker compose -f docker/compose/docker-compose.dev.yml down
 ```
 
 **접속**:
 ```bash
-# API 접근
+# API 직접 접근 (nginx 없음)
 curl http://localhost:8000/health
 curl http://localhost:8000/api/boards/...
 
 # Swagger 문서
 open http://localhost:8000/swagger/index.html
+
+# PostgreSQL 직접 접근
+psql -h localhost -p 5432 -U postgres -d wealist_board_db
+
+# Redis 직접 접근
+redis-cli -h localhost -p 6379 -a password
+
+# MinIO Console
+open http://localhost:9001
 ```
 
-**환경 변수** (`.env` 파일):
+**환경 변수** (`docker/env/.env.dev`):
 ```bash
 ENV=dev
 SERVER_BASE_PATH=""                    # ALB 없음
 DATABASE_URL=postgresql://postgres:password@postgres:5432/wealist_board_db
-USER_SERVICE_URL=http://user-service:8080
+REDIS_URL=redis://:password@redis:6379/1
+USER_SERVICE_URL=                      # 빈 값 (독립 실행)
 USE_AUTO_MIGRATE=true                  # 자동 마이그레이션
+LOG_LEVEL=debug
 ```
 
 ---
@@ -627,6 +704,22 @@ docker-compose up -d
 
 ### User Service 통신 오류
 
+**독립 개발 환경 (docker-compose.dev.yml)**:
+
+user-service 없이 실행하므로 통신 오류는 정상입니다. board-service는 user-service 의존성 없이 동작하도록 설계되었습니다.
+
+```bash
+# Health check는 user-service 없이도 성공
+curl http://localhost:8000/health
+# 응답: {"status":"healthy","dependencies":{"database":"connected","redis":"connected"}}
+
+# user-service 필요한 API는 503 반환 (정상 동작)
+curl http://localhost:8000/api/workspaces/123/profile
+# 응답: {"error":"Service Unavailable","message":"User service is currently unavailable"}
+```
+
+**통합 환경 (docker-compose.yml)**:
+
 ```bash
 # User Service URL 확인
 echo $USER_SERVICE_URL
@@ -637,6 +730,25 @@ echo $USER_SERVICE_URL
 
 # 연결 테스트
 curl $USER_SERVICE_URL/health
+```
+
+### 독립 개발 환경 문제
+
+```bash
+# 컨테이너 상태 확인
+docker compose -f docker/compose/docker-compose.dev.yml ps
+
+# 모든 서비스가 healthy인지 확인
+docker compose -f docker/compose/docker-compose.dev.yml ps | grep healthy
+
+# 특정 서비스 로그 확인
+docker compose -f docker/compose/docker-compose.dev.yml logs postgres
+docker compose -f docker/compose/docker-compose.dev.yml logs redis
+docker compose -f docker/compose/docker-compose.dev.yml logs minio
+
+# 완전 재시작
+docker compose -f docker/compose/docker-compose.dev.yml down -v
+docker compose -f docker/compose/docker-compose.dev.yml up -d
 ```
 
 ## 보안

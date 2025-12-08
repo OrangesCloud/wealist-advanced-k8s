@@ -21,16 +21,24 @@ func InitRedis(cfg config.Config, log *zap.Logger) error {
 		}
 		client = redis.NewClient(opts)
 	} else {
+		// Password 처리: "NONE"이나 플레이스홀더는 빈 문자열로 처리
+		password := cfg.Redis.Password
+		if password == "NONE" || password == "CHANGE_THIS_REDIS_AUTH_TOKEN_32_CHAR_MIN" {
+			password = ""
+		}
+
 		client = redis.NewClient(&redis.Options{
-			Addr:     "redis:6379",       // docker-compose 내 컨테이너 이름
-			Password: cfg.Redis.Password, // ← 이거 제대로 전달됨!
+			Addr:     "redis:6379", // docker-compose 내 컨테이너 이름
+			Password: password,
 			DB:       1,
 		})
 	}
 
-	// 연결 테스트
+	// 연결 테스트 (실패해도 서비스는 시작)
 	if err := client.Ping(context.Background()).Err(); err != nil {
-		return err
+		log.Warn("Redis connection failed, but service will continue without Redis", zap.Error(err))
+		RedisClient = nil
+		return nil
 	}
 
 	RedisClient = client
