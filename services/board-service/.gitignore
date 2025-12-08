@@ -1,52 +1,91 @@
-# Binaries for programs and plugins
+# ============================================
+# Build Artifacts & Binaries
+# ============================================
+/bin/
+/main
+/board-api
+/api
 *.exe
-*.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
-*.test
+# ============================================
+# Local Configuration (Sensitive Data)
+# ============================================
+configs/config.yaml
+!configs/config.yaml.example
+.env
+.env.local
+.env.dev
+.env.prod
+docker/env/*
 
-# Output of the go coverage tool
-*.out
-
-# Go workspace file
-go.work
-
-# Dependency directories
-vendor/
-
-# Build output
-/bin/
-/dist/
-/main
-/api
-/board-api
-
-# IDE
-.vscode/
+# ============================================
+# IDE & Editor
+# ============================================
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
+*.iml
+*.iws
+*.ipr
 
-# OS
+# ============================================
+# OS Generated Files
+# ============================================
 .DS_Store
 Thumbs.db
+.AppleDouble
+.LSOverride
 
-# Environment variables
-.env
-.env.local
+# ============================================
+# Go Specific
+# ============================================
+vendor/
+*.out
+coverage.html
+*.test
 
-# Logs
+# ============================================
+# Local Development Data (Docker Volumes)
+# ============================================
+postgres-data/
+redis-data/
+minio-data/
+
+# ============================================
+# File Uploads (Local Development)
+# ============================================
+uploads/
+storage/
+files/
+
+# ============================================
+# Log Files
+# ============================================
 *.log
-logs/
 
-# Database
-*.db
-*.sqlite
+# ============================================
+# Backup Files
+# ============================================
+*.bak
 
-# Config (keep example files)
-configs/config.yaml
-!configs/config.yaml.example
+# ============================================
+# AI Tools & Local Development
+# ============================================
+.claude/
+.claudeignore
+CLAUDE.md
+.kiro/
+
+# ============================================
+# Python (Virtual Environments)
+# ============================================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class

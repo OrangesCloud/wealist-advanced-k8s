@@ -1,3 +1,4 @@
+// Package config provides configuration loading and management for the application.
 package config
 
 import (
@@ -12,16 +13,14 @@ import (
 
 // Config holds all configuration for the application
 type Config struct {
-	Server          ServerConfig          `yaml:"server"`
-	Database        DatabaseConfig        `yaml:"database"`
-	Logger          LoggerConfig          `yaml:"logger"`
-	JWT             JWTConfig             `yaml:"jwt"`
-	UserAPI         UserAPIConfig         `yaml:"user_api"`
-	AuthAPI         AuthAPIConfig         `yaml:"auth_api"`                   // auth-service for token validation
-	NotificationAPI NotificationAPIConfig `yaml:"notification_api"`           // notification-service
-	CORS            CORSConfig            `yaml:"cors"`
-	Redis           RedisConfig           `mapstructure:"redis" yaml:"redis"` // ← Redis 추가
-	S3              S3Config              `yaml:"s3"`                          // ← S3 추가
+	Server   ServerConfig   `yaml:"server"`
+	Database DatabaseConfig `yaml:"database"`
+	Logger   LoggerConfig   `yaml:"logger"`
+	JWT      JWTConfig      `yaml:"jwt"`
+	UserAPI  UserAPIConfig  `yaml:"user_api"`
+	CORS     CORSConfig     `yaml:"cors"`
+	Redis    RedisConfig    `mapstructure:"redis" yaml:"redis"` // ← Redis 추가
+	S3       S3Config       `yaml:"s3"`                         // ← S3 추가
 }
 
 // ServerConfig holds server configuration
@@ -41,6 +40,7 @@ type DatabaseConfig struct {
 	User            string        `yaml:"user"`
 	Password        string        `yaml:"password"`
 	DBName          string        `yaml:"dbname"`
+	SSLMode         string        `yaml:"sslmode"`
 	MaxOpenConns    int           `yaml:"max_open_conns"`
 	MaxIdleConns    int           `yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
@@ -64,20 +64,6 @@ type UserAPIConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 }
 
-// AuthAPIConfig holds Auth Service configuration for token validation
-type AuthAPIConfig struct {
-	BaseURL string        `yaml:"base_url"`
-	Timeout time.Duration `yaml:"timeout"`
-}
-
-// NotificationAPIConfig holds Notification Service configuration
-type NotificationAPIConfig struct {
-	BaseURL string        `yaml:"base_url"`
-	APIKey  string        `yaml:"api_key"`
-	Timeout time.Duration `yaml:"timeout"`
-	Enabled bool          `yaml:"enabled"`
-}
-
 // CORSConfig holds CORS configuration
 type CORSConfig struct {
 	AllowedOrigins string `yaml:"allowed_origins"`
@@ -92,12 +78,11 @@ type RedisConfig struct {
 
 // S3Config holds S3 configuration
 type S3Config struct {
-	Bucket         string `yaml:"bucket"`
-	Region         string `yaml:"region"`
-	AccessKey      string `yaml:"access_key"`      // MinIO용만 필요 (선택적)
-	SecretKey      string `yaml:"secret_key"`      // MinIO용만 필요 (선택적)
-	Endpoint       string `yaml:"endpoint"`        // 로컬 MinIO용 - 서비스 간 통신 (선택적)
-	PublicEndpoint string `yaml:"public_endpoint"` // 브라우저 접근용 공개 URL (선택적)
+	Bucket    string `yaml:"bucket"`
+	Region    string `yaml:"region"`
+	AccessKey string `yaml:"access_key"` // MinIO용만 필요 (선택적)
+	SecretKey string `yaml:"secret_key"` // MinIO용만 필요 (선택적)
+	Endpoint  string `yaml:"endpoint"`   // 로컬 MinIO용 (선택적)
 }
 
 // Load loads configuration from file and environment variables
@@ -161,16 +146,6 @@ func getDefaultConfig() Config {
 			BaseURL: "http://localhost:8080",
 			Timeout: 5 * time.Second,
 		},
-		AuthAPI: AuthAPIConfig{
-			BaseURL: "http://localhost:8090",
-			Timeout: 5 * time.Second,
-		},
-		NotificationAPI: NotificationAPIConfig{
-			BaseURL: "http://localhost:8002",
-			APIKey:  "internal-secret-key",
-			Timeout: 5 * time.Second,
-			Enabled: true,
-		},
 		CORS: CORSConfig{
 			AllowedOrigins: "*",
 		},
@@ -211,7 +186,7 @@ func (c *Config) overrideFromEnv() {
 	// Database - DATABASE_URL takes precedence (original format)
 	// Parse DATABASE_URL first if provided
 	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		host, port, user, password, dbname, err := parseDatabaseURL(databaseURL)
+		host, port, user, password, dbname, sslmode, err := parseDatabaseURL(databaseURL)
 		if err != nil {
 			// Log error but continue - individual variables might be set
 			fmt.Fprintf(os.Stderr, "Warning: Failed to parse DATABASE_URL: %v\n", err)
@@ -222,6 +197,7 @@ func (c *Config) overrideFromEnv() {
 			c.Database.User = user
 			c.Database.Password = password
 			c.Database.DBName = dbname
+			c.Database.SSLMode = sslmode
 		}
 	}
 
@@ -273,33 +249,6 @@ func (c *Config) overrideFromEnv() {
 		}
 	}
 
-	// Auth API - AUTH_SERVICE_URL for token validation (블랙리스트 체크 포함)
-	if baseURL := os.Getenv("AUTH_SERVICE_URL"); baseURL != "" {
-		c.AuthAPI.BaseURL = baseURL
-	}
-	if timeout := os.Getenv("AUTH_API_TIMEOUT"); timeout != "" {
-		if d, err := time.ParseDuration(timeout); err == nil {
-			c.AuthAPI.Timeout = d
-		}
-	}
-
-	// Notification API
-	if baseURL := os.Getenv("NOTI_SERVICE_URL"); baseURL != "" {
-		c.NotificationAPI.BaseURL = baseURL
-	}
-	if apiKey := os.Getenv("INTERNAL_API_KEY"); apiKey != "" {
-		c.NotificationAPI.APIKey = apiKey
-	}
-	if timeout := os.Getenv("NOTI_API_TIMEOUT"); timeout != "" {
-		if d, err := time.ParseDuration(timeout); err == nil {
-			c.NotificationAPI.Timeout = d
-		}
-	}
-	// Default to enabled, can be disabled with NOTI_ENABLED=false
-	if enabled := os.Getenv("NOTI_ENABLED"); enabled == "false" {
-		c.NotificationAPI.Enabled = false
-	}
-
 	// CORS - CORS_ORIGINS alias (original format takes precedence)
 	if origins := os.Getenv("CORS_ORIGINS"); origins != "" {
 		c.CORS.AllowedOrigins = origins
@@ -332,9 +281,6 @@ func (c *Config) overrideFromEnv() {
 	}
 	if s3Endpoint := os.Getenv("S3_ENDPOINT"); s3Endpoint != "" {
 		c.S3.Endpoint = s3Endpoint
-	}
-	if s3PublicEndpoint := os.Getenv("S3_PUBLIC_ENDPOINT"); s3PublicEndpoint != "" {
-		c.S3.PublicEndpoint = s3PublicEndpoint
 	}
 }
 
@@ -421,40 +367,44 @@ func (c *Config) validateUserAPIBaseURL() error {
 
 // GetDSN returns the database connection string
 func (c *DatabaseConfig) GetDSN() string {
+	sslmode := c.SSLMode
+	if sslmode == "" {
+		sslmode = "disable"
+	}
 	return fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		c.Host, c.Port, c.User, c.Password, c.DBName,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.Host, c.Port, c.User, c.Password, c.DBName, sslmode,
 	)
 }
 
 // parseDatabaseURL parses a PostgreSQL connection URL and extracts connection components
 // Expected format: postgresql://user:password@host:port/dbname?sslmode=disable
-func parseDatabaseURL(databaseURL string) (host, port, user, password, dbname string, err error) {
+func parseDatabaseURL(databaseURL string) (host, port, user, password, dbname, sslmode string, err error) {
 	if databaseURL == "" {
-		return "", "", "", "", "", fmt.Errorf("DATABASE_URL is empty")
+		return "", "", "", "", "", "", fmt.Errorf("DATABASE_URL is empty")
 	}
 
 	// Parse the URL
 	u, err := url.Parse(databaseURL)
 	if err != nil {
-		return "", "", "", "", "", fmt.Errorf("invalid DATABASE_URL format: %w\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable", err)
+		return "", "", "", "", "", "", fmt.Errorf("invalid DATABASE_URL format: %w\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable", err)
 	}
 
 	// Validate scheme
 	if u.Scheme != "postgresql" && u.Scheme != "postgres" {
-		return "", "", "", "", "", fmt.Errorf("invalid DATABASE_URL scheme '%s': must be 'postgresql' or 'postgres'\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable", u.Scheme)
+		return "", "", "", "", "", "", fmt.Errorf("invalid DATABASE_URL scheme '%s': must be 'postgresql' or 'postgres'\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable", u.Scheme)
 	}
 
 	// Extract user and password
 	if u.User == nil {
-		return "", "", "", "", "", fmt.Errorf("DATABASE_URL missing user credentials\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
+		return "", "", "", "", "", "", fmt.Errorf("DATABASE_URL missing user credentials\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
 	}
 	user = u.User.Username()
 	password, _ = u.User.Password()
 
 	// Extract host and port
 	if u.Host == "" {
-		return "", "", "", "", "", fmt.Errorf("DATABASE_URL missing host\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
+		return "", "", "", "", "", "", fmt.Errorf("DATABASE_URL missing host\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
 	}
 
 	// Split host and port
@@ -471,8 +421,14 @@ func parseDatabaseURL(databaseURL string) (host, port, user, password, dbname st
 	// Extract database name
 	dbname = strings.TrimPrefix(u.Path, "/")
 	if dbname == "" {
-		return "", "", "", "", "", fmt.Errorf("DATABASE_URL missing database name\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
+		return "", "", "", "", "", "", fmt.Errorf("DATABASE_URL missing database name\nExpected format: postgresql://user:password@host:port/dbname?sslmode=disable")
 	}
 
-	return host, port, user, password, dbname, nil
+	// Extract sslmode from query parameters
+	sslmode = u.Query().Get("sslmode")
+	if sslmode == "" {
+		sslmode = "disable"
+	}
+
+	return host, port, user, password, dbname, sslmode, nil
 }

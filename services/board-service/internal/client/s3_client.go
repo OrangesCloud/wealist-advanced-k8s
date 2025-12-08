@@ -1,3 +1,4 @@
+// Package client provides external service client implementations.
 package client
 
 import (
@@ -27,13 +28,11 @@ type S3ClientInterface interface {
 
 // S3Client wraps AWS S3 client and implements S3ClientInterface
 type S3Client struct {
-	client              *s3.Client
-	presignClient       *s3.PresignClient       // For internal operations
-	publicPresignClient *s3.PresignClient       // For browser-accessible presigned URLs
-	bucket              string
-	region              string
-	endpoint            string // MinIO 사용 시 내부 엔드포인트 (Docker 내부 통신용)
-	publicEndpoint      string // 브라우저 접근용 공개 엔드포인트
+	client        *s3.Client
+	presignClient *s3.PresignClient
+	bucket        string
+	region        string
+	endpoint      string // MinIO 사용 시 로컬 엔드포인트를 저장
 }
 
 // NewS3Client creates a new S3 client
@@ -86,58 +85,22 @@ func NewS3Client(cfg *appConfig.S3Config) (*S3Client, error) {
 		return nil, fmt.Errorf("failed to load AWS config: %w", err)
 	}
 
-	// Create S3 client for internal operations
+	// Create S3 client
 	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
 		if cfg.Endpoint != "" {
 			o.UsePathStyle = true // Required for MinIO
 		}
 	})
 
-	// Create presign client for internal use
+	// Create presign client
 	presignClient := s3.NewPresignClient(s3Client)
 
-	// Create a separate presign client for browser-accessible URLs
-	// This uses the public endpoint so signatures are computed correctly
-	var publicPresignClient *s3.PresignClient
-	if cfg.PublicEndpoint != "" && cfg.Endpoint != "" {
-		// Create a new S3 client with public endpoint for presigning
-		publicAwsCfg, err := config.LoadDefaultConfig(context.TODO(),
-			config.WithRegion(cfg.Region),
-			config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(
-				cfg.AccessKey,
-				cfg.SecretKey,
-				"",
-			)),
-			config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-				func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-					return aws.Endpoint{
-						URL:               cfg.PublicEndpoint,
-						HostnameImmutable: true,
-						SigningRegion:     cfg.Region,
-					}, nil
-				},
-			)),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load public AWS config: %w", err)
-		}
-
-		publicS3Client := s3.NewFromConfig(publicAwsCfg, func(o *s3.Options) {
-			o.UsePathStyle = true
-		})
-		publicPresignClient = s3.NewPresignClient(publicS3Client)
-	} else {
-		publicPresignClient = presignClient
-	}
-
 	return &S3Client{
-		client:              s3Client,
-		presignClient:       presignClient,
-		publicPresignClient: publicPresignClient,
-		bucket:              cfg.Bucket,
-		region:              cfg.Region,
-		endpoint:            cfg.Endpoint,
-		publicEndpoint:      cfg.PublicEndpoint,
+		client:        s3Client,
+		presignClient: presignClient,
+		bucket:        cfg.Bucket,
+		region:        cfg.Region,
+		endpoint:      cfg.Endpoint, // Endpoint 값 저장
 	}, nil
 }
 
@@ -169,7 +132,6 @@ func (c *S3Client) GenerateFileKey(entityType, workspaceID, fileExt string) (str
 
 // GeneratePresignedURL generates a presigned URL for uploading a file to S3
 // The URL expires in 5 minutes
-// Uses publicPresignClient to ensure signature matches the public endpoint browsers will use
 func (c *S3Client) GeneratePresignedURL(ctx context.Context, entityType, workspaceID, fileName, contentType string) (string, string, error) {
 	// Extract file extension
 	fileExt := ""
@@ -194,16 +156,29 @@ func (c *S3Client) GeneratePresignedURL(ctx context.Context, entityType, workspa
 	}
 
 	// Generate presigned URL with 5 minute expiration
-	// Use publicPresignClient which is configured with public endpoint
-	// This ensures the signature is computed against the URL browsers will actually use
-	presignedReq, err := c.publicPresignClient.PresignPutObject(ctx, putObjectInput, func(opts *s3.PresignOptions) {
+	presignedReq, err := c.presignClient.PresignPutObject(ctx, putObjectInput, func(opts *s3.PresignOptions) {
 		opts.Expires = 5 * time.Minute
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	return presignedReq.URL, fileKey, nil
+	finalURL := presignedReq.URL
+
+	// 💡 [MinIO/Docker 호스트 치환 로직] c.endpoint가 설정된 경우(로컬 개발 환경)에만 치환을 시도합니다.
+	if c.endpoint != "" {
+		// 1. MinIO의 내부 서비스 이름 정의
+		const internalMinIOHost = "minio:9000"
+
+		// 2. 외부에서 접근 가능한 호스트 (localhost:9000)를 c.endpoint에서 추출
+		externalHost := strings.TrimPrefix(strings.TrimPrefix(c.endpoint, "http://"), "https://")
+
+		// strings.Replace를 사용하여 내부 호스트를 외부 호스트로 치환합니다.
+		finalURL = strings.Replace(finalURL, internalMinIOHost, externalHost, 1)
+	}
+
+	// 변경된 finalURL과 fileKey를 반환합니다.
+	return finalURL, fileKey, nil
 }
 
 // UploadFile uploads a file to S3
@@ -238,13 +213,11 @@ func (c *S3Client) DeleteFile(ctx context.Context, key string) error {
 // GetFileURL returns the public URL for a file
 // S3 Key를 기반으로 다운로드 가능한 URL을 생성합니다.
 func (c *S3Client) GetFileURL(key string) string {
-	// MinIO 환경인 경우 - publicEndpoint 사용 (브라우저 접근용)
-	if c.publicEndpoint != "" {
-		return fmt.Sprintf("%s/%s/%s", strings.TrimSuffix(c.publicEndpoint, "/"), c.bucket, key)
-	}
-
-	// MinIO 환경이지만 publicEndpoint가 없는 경우 - endpoint fallback
+	// MinIO 환경인 경우 (endpoint가 설정된 경우)
 	if c.endpoint != "" {
+		// 예: http://localhost:9000/bucket/key
+
+		// c.endpoint는 "http://localhost:9000" 형태
 		return fmt.Sprintf("%s/%s/%s", strings.TrimSuffix(c.endpoint, "/"), c.bucket, key)
 	}
 

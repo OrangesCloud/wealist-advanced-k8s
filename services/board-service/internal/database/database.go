@@ -3,21 +3,11 @@ package database
 import (
 	"context"
 	"fmt"
-	"log"
-	"sync"
 	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-)
-
-var (
-	globalDB *gorm.DB
-	dbMux    sync.RWMutex
-
-	// DBReady는 DB 연결 상태를 나타냄
-	DBReady = false
 )
 
 // Config holds database configuration
@@ -29,7 +19,6 @@ type Config struct {
 }
 
 // New creates a new database connection
-// DB 연결 실패해도 에러만 반환하고 앱은 계속 실행됨 (EKS pod 생존 보장)
 func New(cfg Config) (*gorm.DB, error) {
 	// Configure GORM
 	gormConfig := &gorm.Config{
@@ -39,26 +28,10 @@ func New(cfg Config) (*gorm.DB, error) {
 		},
 	}
 
-	// Open connection with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	var db *gorm.DB
-	var err error
-
-	done := make(chan bool, 1)
-	go func() {
-		db, err = gorm.Open(postgres.Open(cfg.DSN), gormConfig)
-		done <- true
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, fmt.Errorf("database connection timeout")
-	case <-done:
-		if err != nil {
-			return nil, fmt.Errorf("failed to connect to database: %w", err)
-		}
+	// Open connection
+	db, err := gorm.Open(postgres.Open(cfg.DSN), gormConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	// Get underlying SQL DB
@@ -73,55 +46,14 @@ func New(cfg Config) (*gorm.DB, error) {
 	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
 	// Test connection with context timeout
-	pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer pingCancel()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	if err := sqlDB.PingContext(pingCtx); err != nil {
+	if err := sqlDB.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// 성공 시 전역 변수 업데이트
-	dbMux.Lock()
-	globalDB = db
-	DBReady = true
-	dbMux.Unlock()
-
 	return db, nil
-}
-
-// NewAsync는 백그라운드에서 DB 연결을 시도합니다.
-// 앱 시작을 블로킹하지 않고 연결 재시도를 계속합니다.
-func NewAsync(cfg Config, retryInterval time.Duration) {
-	go func() {
-		for {
-			if IsDBReady() {
-				return // 이미 연결됨
-			}
-
-			_, err := New(cfg)
-			if err != nil {
-				log.Printf("⚠️  DB connection failed, retrying in %v: %v\n", retryInterval, err)
-				time.Sleep(retryInterval)
-				continue
-			}
-			log.Println("✅ PostgreSQL connected successfully (async)")
-			return
-		}
-	}()
-}
-
-// GetDB returns the global database instance (nil if not connected)
-func GetDB() *gorm.DB {
-	dbMux.RLock()
-	defer dbMux.RUnlock()
-	return globalDB
-}
-
-// IsDBReady returns whether DB is connected
-func IsDBReady() bool {
-	dbMux.RLock()
-	defer dbMux.RUnlock()
-	return DBReady && globalDB != nil
 }
 
 // Close closes the database connection

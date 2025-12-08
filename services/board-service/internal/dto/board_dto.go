@@ -1,3 +1,4 @@
+// Package dto provides data transfer objects for API requests and responses.
 package dto
 
 import (
@@ -52,7 +53,7 @@ type UpdateBoardFieldRequest struct {
 // @Description File attachment metadata for boards and projects
 // @Description Contains information about uploaded files including S3 URL, size, and content type
 type AttachmentResponse struct {
-	ID          uuid.UUID `json:"attachmentId" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
+	ID          uuid.UUID `json:"id" example:"f47ac10b-58cc-4372-a567-0e02b2c3d479"`
 	FileName    string    `json:"fileName" example:"document.pdf"`
 	FileURL     string    `json:"fileUrl" example:"https://s3.amazonaws.com/bucket/file.pdf"`
 	FileSize    int64     `json:"fileSize" example:"1024000"`
@@ -82,7 +83,7 @@ type BoardResponse struct {
 	UpdatedAt      time.Time              `json:"updatedAt" example:"2024-01-15T14:20:00Z"`
 }
 
-// PaginatedBoardsResponse represents paginated boards response
+// PaginatedBoardsResponse represents a paginated list of boards with metadata.
 type PaginatedBoardsResponse struct {
 	Boards []BoardResponse `json:"boards"`
 	Total  int64           `json:"total"`
