@@ -29,7 +29,7 @@ spring:
             scope:
               - email
               - profile
-            redirect-uri: ${OAUTH2_CLIENT_REDIRECT_URI:http://localhost:8090/login/oauth2/code/google}
+            redirect-uri: ${OAUTH2_CLIENT_REDIRECT_URI:http://localhost:8080/login/oauth2/code/google}
             authorization-grant-type: authorization_code
             client-name: Google
         provider:
@@ -82,13 +82,23 @@ management:
   endpoint:
     health:
       show-details: always
+      # Kubernetes probe 지원 활성화
       probes:
         enabled: true
+      # Health group 정의: liveness는 서비스 자체만, readiness는 Redis 포함
       group:
         liveness:
           include: livenessState
         readiness:
           include: readinessState, redis
+  # Health indicator 활성화
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    redis:
+      enabled: true
   metrics:
     export:
       enabled: true

@@ -25,6 +25,9 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+      # DB 연결 실패해도 앱 시작 허용 (EKS에서 pod 생존 보장)
+      # -1: 시작 시 연결 검증 안 함, 필요 시 lazy 연결
+      initialization-fail-timeout: -1
 
   jpa:
     hibernate:
@@ -123,7 +126,26 @@ management:
   endpoint:
     health:
       show-details: always
+      # Kubernetes probe 지원 활성화
+      probes:
+        enabled: true
+      # Health group 정의: liveness는 서비스 자체만, readiness는 DB/Redis 포함
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState, db, redis
     export:
+      enabled: true
+  # Health indicator 활성화
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    db:
+      enabled: true
+    redis:
       enabled: true
   metrics:
     export:
