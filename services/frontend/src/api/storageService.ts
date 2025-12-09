@@ -534,10 +534,9 @@ export const getRecentFiles = async (
  * 즐겨찾기 추가
  * @todo Backend에 즐겨찾기 API 구현 필요
  */
-export const addToStarred = async (
-  entityType: 'FILE' | 'FOLDER',
-  entityId: string,
-): Promise<void> => {
+export const addToStarred = async (): // entityType: 'FILE' | 'FOLDER',
+// entityId: string,
+Promise<void> => {
   console.warn('Starred feature not yet implemented in backend');
   // TODO: await storageServiceClient.post('/storage/starred', { entityType, entityId });
 };
