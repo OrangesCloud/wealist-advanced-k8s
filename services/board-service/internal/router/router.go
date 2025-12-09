@@ -150,22 +150,11 @@ func readinessHandler(db *gorm.DB) gin.HandlerFunc {
 		checks := gin.H{}
 		isReady := true
 
-		// Check database connection
-		sqlDB, err := db.DB()
-		if err != nil {
+		// Check database connection using global DB instance
+		if !database.IsConnected() {
 			c.JSON(503, gin.H{
 				"status":   "not_ready",
-				"database": "error",
-				"error":    err.Error(),
-			})
-			return
-		}
-
-		if err := sqlDB.Ping(); err != nil {
-			c.JSON(503, gin.H{
-				"status":   "not_ready",
-				"database": "disconnected",
-				"error":    err.Error(),
+				"database": "not_connected",
 			})
 			return
 		}

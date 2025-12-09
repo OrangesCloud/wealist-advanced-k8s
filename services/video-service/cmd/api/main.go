@@ -54,11 +54,14 @@ func main() {
 	// Initialize database
 	db, err := database.NewDB(cfg)
 	if err != nil {
-		logger.Fatal("Failed to connect to database", zap.Error(err))
+		logger.Warn("Failed to connect to database on startup, will retry in background", zap.Error(err))
+		database.NewAsync(cfg, 5*time.Second)
+	} else {
+		database.SetDB(db)
+		logger.Info("Database connected successfully")
+		sqlDB, _ := db.DB()
+		defer sqlDB.Close()
 	}
-
-	sqlDB, _ := db.DB()
-	defer sqlDB.Close()
 
 	// Initialize Redis
 	var redisClient *redis.Client

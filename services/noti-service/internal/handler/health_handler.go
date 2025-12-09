@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"noti-service/internal/database"
 	"noti-service/internal/sse"
 	"time"
 
@@ -38,14 +39,19 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 
 	connections := make(map[string]string)
 
-	// Check database
-	sqlDB, err := h.db.DB()
-	if err != nil {
-		connections["database"] = "error: " + err.Error()
-	} else if err := sqlDB.PingContext(ctx); err != nil {
-		connections["database"] = "error: " + err.Error()
+	// Check database using global DB instance
+	if !database.IsConnected() {
+		connections["database"] = "error: not connected"
 	} else {
-		connections["database"] = "connected"
+		db := database.GetDB()
+		sqlDB, err := db.DB()
+		if err != nil {
+			connections["database"] = "error: " + err.Error()
+		} else if err := sqlDB.PingContext(ctx); err != nil {
+			connections["database"] = "error: " + err.Error()
+		} else {
+			connections["database"] = "connected"
+		}
 	}
 
 	// Check Redis
