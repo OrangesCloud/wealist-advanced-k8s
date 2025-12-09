@@ -55,7 +55,7 @@ SERVICES := user-service auth-service board-service chat-service noti-service fr
 build-all: $(addprefix build-,$(SERVICES))
 
 build-user-service:
-	docker build -t user-service:local -f services/user-service/Dockerfile services/user-service
+	docker build -t user-service:local -f services/user-service/docker/Dockerfile services/user-service
 
 build-auth-service:
 	docker build -t auth-service:local -f services/auth-service/Dockerfile services/auth-service
@@ -67,7 +67,7 @@ build-chat-service:
 	docker build -t chat-service:local -f services/chat-service/docker/Dockerfile services/chat-service
 
 build-noti-service:
-	docker build -t noti-service:local -f services/noti-service/Dockerfile services/noti-service
+	docker build -t noti-service:local -f services/noti-service/docker/Dockerfile services/noti-service
 
 build-frontend:
 	docker build -t frontend:local -f services/frontend/Dockerfile services/frontend
