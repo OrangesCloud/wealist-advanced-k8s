@@ -31,7 +31,7 @@ const AuthPage: React.FC = () => {
     // 토큰과 유저 ID가 모두 있을 때만 리다이렉트
     if (accessToken && userId) {
       // TODO: 나중에는 백엔드에 토큰 유효성 검증 API 호출하는 것이 더 좋음
-      navigate('/workspaces', { replace: true });
+      navigate('/dashboard', { replace: true });
     } else if (accessToken || userId) {
       // 불완전한 인증 정보가 있으면 정리
       localStorage.removeItem('accessToken');

@@ -65,10 +65,9 @@ case $COMMAND in
         # echo -e "${BLUE}📝 Swagger 문서 확인 중...${NC}"
         # ./docker/scripts/generate-swagger.sh all 2>/dev/null || echo -e "${YELLOW}⚠️  Swagger 생성 스킵 (swag 미설치 - Docker에서 생성됨)${NC}"
 
-        echo -e "${BLUE}🔨 이미지 빌드 중...${NC}"
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES build
-        echo -e "${BLUE}🚀 컨테이너 시작 중...${NC}"
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d
+        echo -e "${BLUE}🔨 이미지 빌드 및 컨테이너 시작 중 (병렬 처리)...${NC}"
+        # --build: 빌드 완료된 서비스부터 바로 시작 (병렬 처리)
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up --build -d
         echo -e "${GREEN}✅ 개발 환경이 시작되었습니다.${NC}"
         echo -e "${BLUE}📊 서비스 접속 정보:${NC}"
         echo "   - Frontend:    http://localhost:3000"
@@ -76,12 +75,27 @@ case $COMMAND in
         echo "   - User API:    http://localhost:8090"
         echo "   - Board API:   http://localhost:8000"
         echo "   - Chat API:    http://localhost:8001"
+        echo "   - Noti API:    http://localhost:8002"
+        echo "   - Storage API: http://localhost:8003"
+        echo "   - Video API:   http://localhost:8004"
+        echo "   - LiveKit:     ws://localhost:7880 (WebRTC SFU)"
         echo "   - PostgreSQL:  localhost:5432"
         echo "   - Redis:       localhost:6379"
-        echo "   - Auth API swagger:    http://localhost:8080/swagger-ui/index.html"
-        echo "   - User API swagger:    http://localhost:8090/swagger-ui/index.html"
-        echo "   - Board API swagger:   http://localhost:8000/swagger/index.html"
-        echo "   - Chat API swagger:    http://localhost:8001/swagger/index.html"
+        echo "   - MinIO:       http://localhost:9000 (Console: http://localhost:9001)"
+        echo -e ""
+        echo -e "${BLUE}📈 모니터링:${NC}"
+        echo "   - Grafana:     http://localhost:3001 (admin/admin)"
+        echo "   - Prometheus:  http://localhost:9090"
+        echo "   - Loki:        http://localhost:3100"
+        echo -e ""
+        echo -e "${BLUE}📚 Swagger 문서:${NC}"
+        echo "   - Auth API:    http://localhost:8080/swagger-ui/index.html"
+        echo "   - User API:    http://localhost:8090/swagger-ui/index.html"
+        echo "   - Board API:   http://localhost:8000/swagger/index.html"
+        echo "   - Chat API:    http://localhost:8001/swagger/index.html"
+        echo "   - Noti API:    http://localhost:8002/swagger/index.html"
+        echo "   - Storage API: http://localhost:8003/swagger/index.html"
+        echo "   - Video API:   http://localhost:8004/swagger/index.html"
         echo -e ""
         echo -e "${BLUE}💡 로그 확인: ./docker/scripts/dev.sh logs${NC}"
         ;;
@@ -119,9 +133,9 @@ case $COMMAND in
         ;;
 
     rebuild)
-        echo -e "${BLUE}🔨 이미지를 다시 빌드하고 시작합니다...${NC}"
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES build
-        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up -d
+        echo -e "${BLUE}🔨 이미지를 다시 빌드하고 시작합니다 (병렬 처리)...${NC}"
+        # --build: 빌드 완료된 서비스부터 바로 시작 (병렬 처리)
+        docker compose $ENV_FILE_OPTION $COMPOSE_FILES up --build -d
         echo -e "${GREEN}✅ 빌드 및 시작이 완료되었습니다.${NC}"
         ;;
 

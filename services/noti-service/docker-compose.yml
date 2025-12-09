@@ -15,10 +15,10 @@ services:
     image: wealist/noti-service:local
     container_name: wealist-noti-service-standalone
     ports:
-      - "8084:8084"
+      - "8002:8002"
     environment:
       - ENV=dev
-      - PORT=8084
+      - PORT=8002
       - LOG_LEVEL=debug
       # Database
       - DATABASE_URL=postgresql://noti_service:noti_service_pass@host.docker.internal:5432/wealist_noti_db?sslmode=disable
@@ -35,7 +35,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8084/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8002/health"]
       interval: 30s
       timeout: 3s
       retries: 3

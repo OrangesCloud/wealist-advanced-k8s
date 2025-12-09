@@ -36,6 +36,9 @@ import { formatDate } from '../../../utils/date';
 import Portal from '../../common/Portal';
 import CommentList from '../../comment/CommentList'; // 경로 확인 필요
 import { useAuth } from '../../../contexts/AuthContext';
+import { MeetingLinkText } from '../../common/MeetingLinkText';
+import { videoService, CallHistory } from '../../../api/videoService';
+import { CallHistoryDetailModal } from '../../video/CallHistoryDetailModal';
 
 // 1. 정적 데이터를 담을 인터페이스 정의
 interface BoardState {
@@ -123,6 +126,29 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
   // Comment state
   const [comments, setComments] = useState<CommentResponse[]>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  // Meeting history modal state
+  const [selectedMeeting, setSelectedMeeting] = useState<CallHistory | null>(null);
+  const [_isLoadingMeeting, setIsLoadingMeeting] = useState(false);
+
+  // 회의 링크 클릭 처리
+  const handleMeetingClick = async (meetingId: string) => {
+    try {
+      setIsLoadingMeeting(true);
+      const history = await videoService.getCallHistory(meetingId);
+      if (history) {
+        setSelectedMeeting(history);
+      } else {
+        alert('회의 기록을 찾을 수 없습니다.');
+      }
+    } catch (error) {
+      console.error('Failed to fetch meeting:', error);
+      alert('회의 기록을 불러오는데 실패했습니다.');
+    } finally {
+      setIsLoadingMeeting(false);
+    }
+  };
+
   // 💡 삭제: newComment, selectedFile, fileInputRef (CommentList가 담당함)
   // 이미지 파일 여부 확인
   const isImageFile = (contentType?: string, fileName?: string): boolean => {
@@ -315,7 +341,11 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
               </div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">설명</label>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                {boardData.content || '설명이 없습니다.'}
+                {boardData.content ? (
+                  <MeetingLinkText text={boardData.content} onMeetingClick={handleMeetingClick} />
+                ) : (
+                  '설명이 없습니다.'
+                )}
               </p>
               {/* 보드 첨부파일 다운로드 (기존 UI 개선) */}
               <div
@@ -445,7 +475,9 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
                 {assigneeMember ? (
                   <div className="flex items-center gap-2">
                     <AvatarStack members={[assigneeMember]} />
-                    <span className="text-sm">{assigneeMember.nickName || assigneeMember.userEmail || 'Unknown'}</span>
+                    <span className="text-sm">
+                      {assigneeMember.nickName || assigneeMember.userEmail || 'Unknown'}
+                    </span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">할당되지 않음</span>
@@ -565,6 +597,15 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 회의 기록 상세 모달 */}
+      {selectedMeeting && (
+        <CallHistoryDetailModal
+          history={selectedMeeting}
+          onClose={() => setSelectedMeeting(null)}
+          memberMap={new Map(workspaceMembers.map((m) => [m.userId, m]))}
+        />
+      )}
     </Portal>
   );
 };

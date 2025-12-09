@@ -24,6 +24,7 @@ const getApiBaseUrl = (path: string): string => {
       if (path?.includes('/api/boards')) return `${INJECTED_API_BASE_URL}:8000/api`;
       if (path?.includes('/api/chats')) return `${INJECTED_API_BASE_URL}:8001${path}`;
       if (path?.includes('/api/notifications')) return `${INJECTED_API_BASE_URL}:8002`;
+      if (path?.includes('/api/storage')) return `${INJECTED_API_BASE_URL}:8003/api`; // storage-service (base path only)
     }
 
     return `${INJECTED_API_BASE_URL}${path}`;
@@ -39,6 +40,7 @@ export const USER_SERVICE_API_URL = getApiBaseUrl('/api/users'); // 💡 user-se
 export const BOARD_SERVICE_API_URL = getApiBaseUrl('/api/boards/api');
 export const CHAT_SERVICE_API_URL = getApiBaseUrl('/api/chats');
 export const NOTI_SERVICE_API_URL = getApiBaseUrl('/api/notifications');
+export const STORAGE_SERVICE_API_URL = getApiBaseUrl('/api/storage'); // storage-service (Google Drive like)
 
 // ============================================================================
 // Axios 인스턴스 생성
@@ -85,6 +87,15 @@ export const chatServiceClient = axios.create({
  */
 export const notiServiceClient = axios.create({
   baseURL: NOTI_SERVICE_API_URL,
+  headers: { 'Content-Type': 'application/json' },
+  withCredentials: true,
+});
+
+/**
+ * Storage Service API (Go)를 위한 Axios 인스턴스 - Google Drive like storage
+ */
+export const storageServiceClient = axios.create({
+  baseURL: STORAGE_SERVICE_API_URL,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
@@ -239,12 +250,14 @@ setupRequestInterceptor(userRepoClient);
 setupRequestInterceptor(boardServiceClient);
 setupRequestInterceptor(chatServiceClient);
 setupRequestInterceptor(notiServiceClient);
+setupRequestInterceptor(storageServiceClient);
 
 setupUnifiedResponseInterceptor(authServiceClient);
 setupUnifiedResponseInterceptor(userRepoClient);
 setupUnifiedResponseInterceptor(boardServiceClient);
 setupUnifiedResponseInterceptor(chatServiceClient);
 setupUnifiedResponseInterceptor(notiServiceClient);
+setupUnifiedResponseInterceptor(storageServiceClient);
 
 export const getAuthHeaders = (token: string) => ({
   Authorization: `Bearer ${token}`,

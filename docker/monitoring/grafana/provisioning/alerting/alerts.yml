@@ -1,0 +1,272 @@
+# =============================================================================
+# Grafana Alert Rules for weAlist
+# =============================================================================
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: wealist-alerts
+    folder: weAlist Alerts
+    interval: 1m
+    rules:
+      # =========================================================================
+      # 서비스 다운 알림
+      # =========================================================================
+      - uid: service-down
+        title: 서비스 다운
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: up
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+              refId: C
+              type: threshold
+              expression: B
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: "{{ $labels.job }} 서비스가 다운되었습니다"
+          description: "{{ $labels.job }} 서비스가 1분 이상 응답하지 않습니다."
+        labels:
+          severity: critical
+
+      # =========================================================================
+      # 높은 에러율 알림 (5% 초과)
+      # =========================================================================
+      - uid: high-error-rate
+        title: 높은 에러율
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_requests_total{status=~"5.."}[5m])) by (job) / sum(rate(http_requests_total[5m])) by (job)
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.05
+                    type: gt
+              refId: C
+              type: threshold
+              expression: B
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "{{ $labels.job }} 에러율이 5%를 초과했습니다"
+          description: "{{ $labels.job }} 서비스의 에러율이 {{ $values.B.Value | printf \"%.2f\" }}% 입니다."
+        labels:
+          severity: warning
+
+      # =========================================================================
+      # 느린 응답 시간 알림 (p95 > 2초)
+      # =========================================================================
+      - uid: slow-response
+        title: 느린 응답 시간
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 2
+                    type: gt
+              refId: C
+              type: threshold
+              expression: B
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "{{ $labels.job }} 응답시간이 느립니다"
+          description: "{{ $labels.job }} 서비스의 p95 응답시간이 {{ $values.B.Value | printf \"%.2f\" }}초 입니다."
+        labels:
+          severity: warning
+
+      # =========================================================================
+      # Redis 메모리 부족 알림 (200MB 초과)
+      # =========================================================================
+      - uid: redis-memory-high
+        title: Redis 메모리 사용량 높음
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: redis_memory_used_bytes
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 209715200
+                    type: gt
+              refId: C
+              type: threshold
+              expression: B
+        noDataState: OK
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "Redis 메모리 사용량이 높습니다"
+          description: "Redis 메모리 사용량이 200MB를 초과했습니다."
+        labels:
+          severity: warning
+
+      # =========================================================================
+      # 트래픽 급증 알림 (RPS > 100)
+      # =========================================================================
+      - uid: high-traffic
+        title: 트래픽 급증
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: sum(rate(http_requests_total[5m]))
+              instant: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              reducer: last
+              expression: A
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 100
+                    type: gt
+              refId: C
+              type: threshold
+              expression: B
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "트래픽이 급증했습니다"
+          description: "전체 RPS가 {{ $values.B.Value | printf \"%.0f\" }}로 급증했습니다."
+        labels:
+          severity: info

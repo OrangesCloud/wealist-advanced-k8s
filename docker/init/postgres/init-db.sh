@@ -50,9 +50,33 @@ EOSQL
 
 echo "✅ Notification 서비스 데이터베이스 생성 완료: ${NOTI_DB_NAME}"
 
+# Storage Service Database
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    CREATE DATABASE ${STORAGE_DB_NAME};
+    CREATE USER ${STORAGE_DB_USER} WITH PASSWORD '${STORAGE_DB_PASSWORD}';
+    GRANT ALL PRIVILEGES ON DATABASE ${STORAGE_DB_NAME} TO ${STORAGE_DB_USER};
+    \c ${STORAGE_DB_NAME}
+    GRANT ALL ON SCHEMA public TO ${STORAGE_DB_USER};
+EOSQL
+
+echo "✅ Storage 서비스 데이터베이스 생성 완료: ${STORAGE_DB_NAME}"
+
+# Video Service Database
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    CREATE DATABASE ${VIDEO_DB_NAME:-wealist_video_db};
+    CREATE USER ${VIDEO_DB_USER:-video_user} WITH PASSWORD '${VIDEO_DB_PASSWORD:-video_password}';
+    GRANT ALL PRIVILEGES ON DATABASE ${VIDEO_DB_NAME:-wealist_video_db} TO ${VIDEO_DB_USER:-video_user};
+    \c ${VIDEO_DB_NAME:-wealist_video_db}
+    GRANT ALL ON SCHEMA public TO ${VIDEO_DB_USER:-video_user};
+EOSQL
+
+echo "✅ Video 서비스 데이터베이스 생성 완료: ${VIDEO_DB_NAME:-wealist_video_db}"
+
 echo "🎉 모든 데이터베이스 초기화 완료!"
 echo "📋 생성된 데이터베이스:"
 echo "   - ${USER_DB_NAME} (User Service)"
 echo "   - ${BOARD_DB_NAME} (Board Service)"
 echo "   - ${CHAT_DB_NAME} (Chat Service)"
 echo "   - ${NOTI_DB_NAME} (Notification Service)"
+echo "   - ${STORAGE_DB_NAME} (Storage Service)"
+echo "   - ${VIDEO_DB_NAME:-wealist_video_db} (Video Service)"

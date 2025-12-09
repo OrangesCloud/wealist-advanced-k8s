@@ -32,6 +32,10 @@ func Setup(cfg Config) *gin.Engine {
 	r.Use(gin.Recovery())
 	r.Use(middleware.Logger(cfg.Logger))
 	r.Use(middleware.CORS("*"))
+	r.Use(middleware.Metrics()) // Prometheus metrics middleware
+
+	// Prometheus metrics endpoint
+	r.GET("/metrics", middleware.MetricsHandler())
 
 	// Health check routes
 	r.GET("/health", func(c *gin.Context) {

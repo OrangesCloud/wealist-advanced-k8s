@@ -4,11 +4,12 @@ import { AuthProvider } from './contexts/AuthContext'; // ✅
 // 1. react-router-dom에서 필요한 것들을 임포트합니다.
 import { Routes, Route, Navigate, Outlet, useNavigate } from 'react-router-dom';
 
-// Lazy load 페이지들 (이름 일관성 유지)
+// Lazy load 페이지들
 const AuthPage = lazy(() => import('./pages/Authpage'));
-const SelectWorkspacePage = lazy(() => import('./pages/SelectWorkspacePage'));
-const MainDashboard = lazy(() => import('./pages/MainDashboard'));
+const MyDashboardPage = lazy(() => import('./pages/MyDashboardPage'));
+const WorkspacePage = lazy(() => import('./pages/WorkspacePage'));
 const OAuthRedirectPage = lazy(() => import('./pages/OAuthRedirectPage'));
+const StoragePage = lazy(() => import('./pages/StoragePage'));
 
 const LoadingScreen = ({ msg = '로딩 중..' }) => (
   <div className="text-center min-h-screen flex items-center justify-center bg-gray-50">
@@ -26,12 +27,12 @@ const ProtectedRoute = () => {
   if (!accessToken) {
     return <Navigate to="/" replace />;
   }
-  // 토큰이 있으면 자식 컴포넌트(SelectWorkspacePage 또는 MainDashboard)를 렌더링
+  // 토큰이 있으면 자식 컴포넌트를 렌더링
   return <Outlet />;
 };
 
 const App: React.FC = () => {
-  // 4. [신규] MainDashboard로 전달할 로그아웃 핸들러 생성
+  // 로그아웃 핸들러
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -57,13 +58,22 @@ const App: React.FC = () => {
 
             {/* 3. 보호되는 라우트 (인증 필요) */}
             <Route element={<ProtectedRoute />}>
-              {/* SelectWorkspacePage는 이제 props가 필요 없습니다. */}
-              <Route path="/workspaces" element={<SelectWorkspacePage />} />
+              {/* MyDashboardPage - 로그인 후 기본 대시보드 (워크스페이스 목록) */}
+              <Route path="/dashboard" element={<MyDashboardPage />} />
 
-              {/* MainDashboard는 onLogout prop이 필요합니다. */}
+              {/* 이전 경로 호환성을 위한 리다이렉트 */}
+              <Route path="/workspaces" element={<Navigate to="/dashboard" replace />} />
+
+              {/* WorkspacePage - 워크스페이스 상세 (프로젝트/보드 관리) */}
               <Route
                 path="/workspace/:workspaceId"
-                element={<MainDashboard onLogout={handleLogout} />}
+                element={<WorkspacePage onLogout={handleLogout} />}
+              />
+
+              {/* StoragePage - Google Drive 스타일 스토리지 */}
+              <Route
+                path="/workspace/:workspaceId/storage"
+                element={<StoragePage onLogout={handleLogout} />}
               />
             </Route>
 

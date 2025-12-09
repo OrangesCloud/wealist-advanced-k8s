@@ -25,6 +25,7 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	r.Use(gin.Recovery())
 	r.Use(middleware.LoggerMiddleware(logger))
 	r.Use(middleware.CORSMiddleware("*"))
+	r.Use(middleware.MetricsMiddleware()) // Prometheus metrics
 
 	// Initialize repositories
 	chatRepo := repository.NewChatRepository(db)
@@ -50,6 +51,7 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	// Health endpoints (no auth)
 	r.GET("/health", healthHandler.Health)
 	r.GET("/ready", healthHandler.Ready)
+	r.GET("/metrics", middleware.MetricsHandler()) // Prometheus metrics
 
 	// Swagger documentation (disabled for faster builds)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

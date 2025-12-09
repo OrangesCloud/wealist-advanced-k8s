@@ -1,4 +1,4 @@
-// src/pages/Dashboard.tsx (MainDashboard.tsx)
+// src/pages/WorkspacePage.tsx - 워크스페이스 상세 페이지 (프로젝트/보드 관리)
 
 import { useLocation, useParams } from 'react-router-dom';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
@@ -29,7 +29,7 @@ import { IROLES } from '../types/common';
 import { ProjectManageModal } from '../components/modals/board/ProjectManageModal';
 import type { Notification } from '../types/notification';
 
-interface MainDashboardProps {
+interface WorkspacePageProps {
   onLogout: () => void;
 }
 
@@ -52,9 +52,9 @@ interface FieldOptionsLookup {
 }
 
 // =============================================================================
-// MainDashboard (컨테이너 역할)
+// WorkspacePage (워크스페이스 상세 - 프로젝트/보드 관리)
 // =============================================================================
-const MainDashboard: React.FC<MainDashboardProps> = ({ onLogout }) => {
+const WorkspacePage: React.FC<WorkspacePageProps> = ({ onLogout }) => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const currentWorkspaceId = workspaceId || '';
   const location = useLocation(); // 💡 useLocation 훅 추가
@@ -281,7 +281,7 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ onLogout }) => {
           />
 
       {/* 2. 메인 콘텐츠 영역 */}
-      <div className="flex-grow flex flex-col p-3 sm:p-6 overflow-auto mt-16 ml-20">
+      <div className="flex-grow flex flex-col p-3 sm:p-6 overflow-auto mt-16">
         {error && (
           <div className="mb-4 p-4 bg-red-50 border border-red-300 rounded-lg text-red-700">
             {error}
@@ -388,4 +388,4 @@ const MainDashboard: React.FC<MainDashboardProps> = ({ onLogout }) => {
   );
 };
 
-export default MainDashboard;
+export default WorkspacePage;

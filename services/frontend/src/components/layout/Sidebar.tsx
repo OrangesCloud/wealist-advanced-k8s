@@ -1,6 +1,6 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Home, MessageSquare, Bell, File } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Home, MessageSquare, Bell, HardDrive, Video } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import type { UserProfileResponse, WorkspaceMemberResponse } from '../../types/user';
 
@@ -9,12 +9,15 @@ interface SidebarProps {
   userProfile: UserProfileResponse | null;
   isChatActive: boolean;
   isNotificationActive: boolean;
+  isVideoActive?: boolean;
   onChatToggle: () => void;
   onNotificationToggle: () => void;
+  onVideoToggle?: () => void;
   onUserMenuToggle: () => void;
   onStartChat?: (member: WorkspaceMemberResponse) => Promise<void>;
   totalUnreadCount?: number; // 🔥 총 읽지 않은 메시지 수
   notificationUnreadCount?: number; // 알림 읽지 않은 수
+  activeVideoRoomCount?: number; // 활성 영상통화방 수
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -22,20 +25,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userProfile,
   isChatActive,
   isNotificationActive,
+  isVideoActive = false,
   onChatToggle,
   onNotificationToggle,
+  onVideoToggle,
   onUserMenuToggle,
-  onStartChat,
+  // onStartChat,
   totalUnreadCount = 0,
   notificationUnreadCount = 0,
+  activeVideoRoomCount = 0,
 }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme } = useTheme();
 
   const sidebarWidth = 'w-16 sm:w-20';
 
+  // 현재 경로 확인
+  const isStorageActive = location.pathname.includes('/storage');
+  const isHomeActive = !isStorageActive && location.pathname.includes(`/workspace/${workspaceId}`);
+
   const handleBackToSelect = () => {
-    navigate('/workspaces');
+    navigate('/dashboard');
+  };
+
+  const handleHomeClick = () => {
+    navigate(`/workspace/${workspaceId}`);
+  };
+
+  const handleStorageClick = () => {
+    navigate(`/workspace/${workspaceId}/storage`);
   };
 
   return (
@@ -56,8 +75,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* 사이드바 메뉴 */}
         <div className="flex flex-col gap-2 mt-4 flex-grow px-2 w-full pt-4">
+          {/* 홈 버튼 */}
           <button
-            className="w-12 h-12 rounded-lg mx-auto flex items-center justify-center transition bg-blue-600 text-white ring-2 ring-white/50"
+            onClick={handleHomeClick}
+            className={`w-12 h-12 rounded-lg mx-auto flex items-center justify-center transition ${
+              isHomeActive
+                ? 'bg-blue-600 text-white ring-2 ring-white/50'
+                : 'hover:bg-blue-600/50 text-white/80 ring-1 ring-white/20'
+            }`}
             title="홈"
           >
             <Home className="w-6 h-6" />
@@ -84,6 +109,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
+          {/* 영상통화 버튼 */}
+          <div className="relative mx-auto">
+            <button
+              onClick={onVideoToggle}
+              className={`w-12 h-12 rounded-lg flex items-center justify-center transition ${
+                isVideoActive
+                  ? 'bg-blue-600 text-white ring-2 ring-white/50'
+                  : 'hover:bg-blue-600/50 text-white/80 ring-1 ring-white/20'
+              }`}
+              title="영상통화"
+            >
+              <Video className="w-6 h-6" />
+            </button>
+            {/* 활성 영상통화방 배지 */}
+            {activeVideoRoomCount > 0 && !isVideoActive && (
+              <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-green-500 text-white text-xs rounded-full flex items-center justify-center font-bold ring-2 ring-gray-800">
+                {activeVideoRoomCount > 9 ? '9+' : activeVideoRoomCount}
+              </div>
+            )}
+          </div>
+
           {/* 알림 버튼 */}
           <div className="relative mx-auto">
             <button
@@ -104,11 +150,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
+
+          {/* 스토리지 (드라이브) 버튼 */}
           <button
-            className="w-12 h-12 rounded-lg mx-auto flex items-center justify-center bg-gray-700 hover:bg-gray-600 text-white opacity-50 transition"
-            title="파일"
+            onClick={handleStorageClick}
+            className={`w-12 h-12 rounded-lg mx-auto flex items-center justify-center transition ${
+              isStorageActive
+                ? 'bg-blue-600 text-white ring-2 ring-white/50'
+                : 'hover:bg-blue-600/50 text-white/80 ring-1 ring-white/20'
+            }`}
+            title="드라이브"
           >
-            <File className="w-6 h-6" />
+            <HardDrive className="w-6 h-6" />
           </button>
         </div>
       </div>

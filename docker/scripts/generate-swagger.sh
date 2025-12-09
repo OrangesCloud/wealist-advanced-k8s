@@ -107,6 +107,8 @@ main() {
             generate_swagger "board-service" "$ROOT_DIR/board-service" "$force"
             generate_swagger "chat-service" "$ROOT_DIR/chat-service" "$force"
             generate_swagger "noti-service" "$ROOT_DIR/noti-service" "$force"
+            generate_swagger "storage-service" "$ROOT_DIR/services/storage-service" "$force"
+            generate_swagger "video-service" "$ROOT_DIR/services/video-service" "$force"
             ;;
         user-service|user)
             generate_swagger "user-service" "$ROOT_DIR/user-service" "$force"
@@ -120,15 +122,23 @@ main() {
         noti-service|noti)
             generate_swagger "noti-service" "$ROOT_DIR/noti-service" "$force"
             ;;
+        storage-service|storage)
+            generate_swagger "storage-service" "$ROOT_DIR/services/storage-service" "$force"
+            ;;
+        video-service|video)
+            generate_swagger "video-service" "$ROOT_DIR/services/video-service" "$force"
+            ;;
         *)
             echo "사용법: $0 [service|all] [--force]"
             echo ""
             echo "서비스:"
-            echo "  all          - 모든 Go 서비스"
-            echo "  user-service - User Service"
-            echo "  board-service - Board Service"
-            echo "  chat-service - Chat Service"
-            echo "  noti-service - Notification Service"
+            echo "  all            - 모든 Go 서비스"
+            echo "  user-service   - User Service"
+            echo "  board-service  - Board Service"
+            echo "  chat-service   - Chat Service"
+            echo "  noti-service   - Notification Service"
+            echo "  storage-service - Storage Service"
+            echo "  video-service  - Video Service"
             echo ""
             echo "옵션:"
             echo "  --force      - 변경 여부와 관계없이 강제 재생성"

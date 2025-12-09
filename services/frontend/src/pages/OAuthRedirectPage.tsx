@@ -45,8 +45,8 @@ const OAuthRedirectPage: React.FC = () => {
         userId,
       });
 
-      // 3. 워크스페이스 선택 페이지로 이동 (Protected Route 통과)
-      navigate('/workspaces', { replace: true });
+      // 3. 대시보드 페이지로 이동 (Protected Route 통과)
+      navigate('/dashboard', { replace: true });
     } else {
       // 4. 필수 정보가 없는 경우 에러 처리 및 로그인 페이지로 리다이렉트
       console.error('❌ OAuth 콜백 필수 정보(토큰, nickName) 누락');

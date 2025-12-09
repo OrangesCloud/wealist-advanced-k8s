@@ -25,7 +25,7 @@ services:
     env_file:
       - ../env/.env.dev
     ports:
-      - "${USER_HOST_PORT:-8090}:8080"
+      - "${USER_HOST_PORT:-8080}:8080"
 
     environment:
       # Server Configuration
@@ -102,7 +102,7 @@ services:
     env_file:
       - ../env/.env.dev
     ports:
-      - "${AUTH_HOST_PORT:-8080}:8090"
+      - "${AUTH_HOST_PORT:-8090}:8090"
 
     environment:
       # Server Configuration
@@ -391,6 +391,221 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Storage Service (Go) - Google Drive like storage
+  storage-service:
+    build:
+      context: ../../services/storage-service
+      dockerfile: docker/Dockerfile
+    image: wealist/storage-service:${VERSION:-latest}
+    container_name: wealist-storage-service
+    hostname: storage-service
+    env_file:
+      - ../env/.env.dev
+    ports:
+      - "${STORAGE_HOST_PORT:-8003}:8003"
+
+    environment:
+      # Server Configuration
+      - ENV=dev
+      - PORT=8003
+      - STORAGE_SERVICE_PORT=8003
+      - LOG_LEVEL=debug
+
+      # Database Configuration
+      - DATABASE_URL=postgresql://${STORAGE_DB_USER}:${STORAGE_DB_PASSWORD}@postgres:5432/${STORAGE_DB_NAME}?sslmode=disable
+
+      # JWT Configuration
+      - SECRET_KEY=${JWT_SECRET}
+
+      # Service URLs
+      - AUTH_SERVICE_URL=http://auth-service:8090
+
+      # CORS Configuration
+      - CORS_ORIGINS=${CORS_ORIGINS}
+
+      # S3/MinIO Configuration
+      - S3_BUCKET=${S3_BUCKET}
+      - S3_REGION=${S3_REGION}
+      - S3_ENDPOINT=${S3_ENDPOINT}
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+
+    networks:
+      - frontend-net
+      - backend-net
+      - database-net
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "-O",
+          "/dev/null",
+          "http://localhost:8003/health",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Video Service (Go) - Video Call Room Management
+  video-service:
+    build:
+      context: ../../services/video-service
+      dockerfile: docker/Dockerfile
+    image: wealist/video-service:${VERSION:-latest}
+    container_name: wealist-video-service
+    hostname: video-service
+    env_file:
+      - ../env/.env.dev
+    ports:
+      - "${VIDEO_HOST_PORT:-8004}:8004"
+
+    environment:
+      # Server Configuration
+      - ENV=dev
+      - PORT=8004
+      - SERVER_BASE_PATH=/api/video
+      - LOG_LEVEL=debug
+
+      # Database Configuration
+      - DATABASE_URL=postgresql://${VIDEO_DB_USER}:${VIDEO_DB_PASSWORD}@postgres:5432/${VIDEO_DB_NAME}?sslmode=disable
+
+      # Redis Configuration
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+      # Auth Service
+      - AUTH_SERVICE_URL=http://auth-service:8090
+      - SECRET_KEY=${JWT_SECRET}
+
+      # User Service (base path for workspace validation)
+      - USER_SERVICE_URL=http://user-service:8080/api
+
+      # CORS Configuration
+      - CORS_ORIGINS=${CORS_ORIGINS}
+
+      # LiveKit Configuration
+      - LIVEKIT_HOST=http://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - LIVEKIT_WS_URL=${LIVEKIT_WS_URL:-ws://localhost:7880}
+
+    networks:
+      - frontend-net
+      - backend-net
+      - database-net
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "-O",
+          "/dev/null",
+          "http://localhost:8004/health",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # LiveKit SFU Server - WebRTC Media Server
+  livekit:
+    image: livekit/livekit-server:v1.5
+    container_name: wealist-livekit
+    hostname: livekit
+    ports:
+      - "7880:7880"     # HTTP API & WebSocket
+      - "7881:7881"     # TCP for WebRTC
+      - "50000-50020:50000-50020/udp"  # UDP for WebRTC media (limited range for dev)
+
+    command: --config /etc/livekit.yaml
+
+    volumes:
+      - ../livekit/livekit.yaml:/etc/livekit.yaml:ro
+
+    networks:
+      - frontend-net
+      - backend-net
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # coturn TURN/STUN Server - NAT Traversal
+  coturn:
+    image: coturn/coturn:4.6
+    container_name: wealist-coturn
+    hostname: coturn
+    ports:
+      - "3478:3478"         # STUN/TURN UDP
+      - "3478:3478/udp"     # STUN/TURN UDP
+      - "5349:5349"         # STUN/TURN TLS
+      - "5349:5349/udp"     # STUN/TURN TLS UDP
+
+    volumes:
+      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+
+    command: -c /etc/coturn/turnserver.conf
+
+    networks:
+      - frontend-net
+      - backend-net
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   # Frontend Service (React + Vite)
   frontend-service:
     build:
@@ -463,6 +678,8 @@ services:
       - board-service
       - chat-service
       - noti-service
+      - storage-service
+      - video-service
 
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
@@ -506,6 +723,12 @@ services:
       - NOTI_DB_NAME=${NOTI_DB_NAME}
       - NOTI_DB_USER=${NOTI_DB_USER}
       - NOTI_DB_PASSWORD=${NOTI_DB_PASSWORD}
+      - STORAGE_DB_NAME=${STORAGE_DB_NAME}
+      - STORAGE_DB_USER=${STORAGE_DB_USER}
+      - STORAGE_DB_PASSWORD=${STORAGE_DB_PASSWORD}
+      - VIDEO_DB_NAME=${VIDEO_DB_NAME}
+      - VIDEO_DB_USER=${VIDEO_DB_USER}
+      - VIDEO_DB_PASSWORD=${VIDEO_DB_PASSWORD}
       - PGDATA=/var/lib/postgresql/data/pgdata
 
     volumes:
@@ -663,6 +886,182 @@ services:
     networks:
       - backend-net
 
+  # ===========================================================================
+  # Monitoring Services (Prometheus + Loki + Grafana)
+  # ===========================================================================
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: wealist-prometheus
+    hostname: prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+    networks:
+      - monitoring-net
+      - backend-net
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: wealist-loki
+    hostname: loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+
+    volumes:
+      - ../monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+
+    command: -config.file=/etc/loki/local-config.yaml
+
+    networks:
+      - monitoring-net
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Promtail - Log Collector (Docker logs -> Loki)
+  promtail:
+    image: grafana/promtail:2.9.2
+    container_name: wealist-promtail
+    hostname: promtail
+
+    volumes:
+      - ../monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+
+    command: -config.file=/etc/promtail/config.yml
+
+    networks:
+      - monitoring-net
+
+    depends_on:
+      - loki
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Grafana - Visualization Dashboard
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: wealist-grafana
+    hostname: grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+
+    volumes:
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+
+    networks:
+      - monitoring-net
+
+    depends_on:
+      - prometheus
+      - loki
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Exporter - Redis metrics for Prometheus
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: wealist-redis-exporter
+    hostname: redis-exporter
+    ports:
+      - "${REDIS_EXPORTER_PORT:-9121}:9121"
+
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+
+    networks:
+      - monitoring-net
+      - database-net
+
+    depends_on:
+      redis:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # PostgreSQL Exporter - PostgreSQL metrics for Prometheus
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: wealist-postgres-exporter
+    hostname: postgres-exporter
+    ports:
+      - "${POSTGRES_EXPORTER_PORT:-9187}:9187"
+
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${POSTGRES_SUPERUSER}:${POSTGRES_SUPERUSER_PASSWORD}@postgres:5432/postgres?sslmode=disable
+
+    networks:
+      - monitoring-net
+      - database-net
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 # =============================================================================
 # Networks
 # =============================================================================
@@ -679,6 +1078,10 @@ networks:
     driver: bridge
     name: wealist-database-net
 
+  monitoring-net:
+    driver: bridge
+    name: wealist-monitoring-net
+
 # =============================================================================
 # Volumes
 # =============================================================================
@@ -693,4 +1096,16 @@ volumes:
 
   minio-data:
     name: wealist-minio-data
+    driver: local
+
+  prometheus-data:
+    name: wealist-prometheus-data
+    driver: local
+
+  loki-data:
+    name: wealist-loki-data
+    driver: local
+
+  grafana-data:
+    name: wealist-grafana-data
     driver: local
