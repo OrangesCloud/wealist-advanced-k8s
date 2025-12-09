@@ -150,9 +150,6 @@ func (c *Config) overrideFromEnv() {
 	if port := os.Getenv("PORT"); port != "" {
 		c.Server.Port = port
 	}
-	if port := os.Getenv("STORAGE_SERVICE_PORT"); port != "" {
-		c.Server.Port = port
-	}
 
 	if env := os.Getenv("ENV"); env != "" {
 		switch env {
