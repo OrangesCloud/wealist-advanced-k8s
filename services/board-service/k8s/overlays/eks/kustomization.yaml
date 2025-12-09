@@ -5,6 +5,7 @@ namespace: wealist-prod
 
 resources:
   - ../../base
+  - hpa.yaml
 
 images:
   - name: board-service
