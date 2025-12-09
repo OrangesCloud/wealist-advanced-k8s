@@ -1,7 +1,7 @@
 .PHONY: help dev-up dev-down dev-logs build-all build-% deploy-local deploy-eks clean
 
 # Kind cluster name (default: wealist)
-KIND_CLUSTER ?= wealist
+KIND_CLUSTER ?= wealist-project
 
 # Default target
 help:
@@ -133,6 +133,7 @@ kind-load-frontend:
 # =============================================================================
 
 k8s-apply-local: kind-load-all
+	kubectl apply -f services/namespace.yaml
 	kubectl apply -k infrastructure/overlays/local
 	kubectl apply -k services/user-service/k8s/overlays/local
 	kubectl apply -k services/auth-service/k8s/overlays/local
@@ -153,6 +154,7 @@ k8s-delete-local:
 	kubectl delete -k services/auth-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/user-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k infrastructure/overlays/local --ignore-not-found
+	kubectl delete -f services/namespace.yaml --ignore-not-found
 
 # Preview kustomize output
 kustomize-infra:
@@ -226,5 +228,8 @@ status:
 	@echo "=== Docker Containers ==="
 	docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 	@echo ""
-	@echo "=== Kubernetes Pods (wealist-dev) ==="
-	kubectl get pods -n wealist-dev 2>/dev/null || echo "Namespace not found"
+	@echo "=== Kubernetes Pods (wealist-app) ==="
+	kubectl get pods -n wealist-app 2>/dev/null || echo "Namespace wealist-app not found"
+	@echo ""
+	@echo "=== Kubernetes Pods (wealist-infra) ==="
+	kubectl get pods -n wealist-infra 2>/dev/null || echo "Namespace wealist-infra not found"
