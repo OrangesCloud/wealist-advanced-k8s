@@ -1,5 +1,8 @@
 .PHONY: help dev-up dev-down dev-logs build-all build-% deploy-local deploy-eks clean
 
+# Kind cluster name (default: wealist)
+KIND_CLUSTER ?= wealist
+
 # Default target
 help:
 	@echo "Wealist Project - Available commands:"
@@ -15,8 +18,14 @@ help:
 	@echo "    make build-all       - Build all service images"
 	@echo "    make build-<service> - Build specific service (e.g., build-user-service)"
 	@echo ""
-	@echo "  Kubernetes (Local):"
-	@echo "    make k8s-apply-local    - Apply all k8s manifests (local)"
+	@echo "  Kind (Local Kubernetes):"
+	@echo "    make kind-create        - Create kind cluster"
+	@echo "    make kind-delete        - Delete kind cluster"
+	@echo "    make kind-load-all      - Load all images to kind cluster"
+	@echo "    make kind-load-<svc>    - Load specific service image to kind"
+	@echo ""
+	@echo "  Kubernetes (Local/Kind):"
+	@echo "    make k8s-apply-local    - Load images & apply k8s manifests (local)"
 	@echo "    make k8s-delete-local   - Delete all k8s resources (local)"
 	@echo "    make kustomize-<svc>    - Preview kustomize output for service"
 	@echo ""
@@ -79,13 +88,51 @@ build-video-service:
 	docker build -t video-service:local -f services/video-service/docker/Dockerfile services/video-service
 
 build-frontend:
-	docker build -t frontend:local -f services/frontend/Dockerfile services/frontend
+	docker build -t frontend:local -f services/frontend/Dockerfile.local services/frontend
 
 # =============================================================================
-# Kubernetes - Local (Kustomize)
+# Kind (Local Kubernetes Cluster)
 # =============================================================================
 
-k8s-apply-local:
+kind-create:
+	kind create cluster --name $(KIND_CLUSTER)
+	@echo "Kind cluster '$(KIND_CLUSTER)' created successfully"
+
+kind-delete:
+	kind delete cluster --name $(KIND_CLUSTER)
+
+kind-load-all: $(addprefix kind-load-,$(SERVICES))
+	@echo "All images loaded to kind cluster '$(KIND_CLUSTER)'"
+
+kind-load-user-service:
+	kind load docker-image user-service:local --name $(KIND_CLUSTER)
+
+kind-load-auth-service:
+	kind load docker-image auth-service:local --name $(KIND_CLUSTER)
+
+kind-load-board-service:
+	kind load docker-image board-service:local --name $(KIND_CLUSTER)
+
+kind-load-chat-service:
+	kind load docker-image chat-service:local --name $(KIND_CLUSTER)
+
+kind-load-noti-service:
+	kind load docker-image noti-service:local --name $(KIND_CLUSTER)
+
+kind-load-storage-service:
+	kind load docker-image storage-service:local --name $(KIND_CLUSTER)
+
+kind-load-video-service:
+	kind load docker-image video-service:local --name $(KIND_CLUSTER)
+
+kind-load-frontend:
+	kind load docker-image frontend:local --name $(KIND_CLUSTER)
+
+# =============================================================================
+# Kubernetes - Local (Kustomize + Kind)
+# =============================================================================
+
+k8s-apply-local: kind-load-all
 	kubectl apply -k infrastructure/overlays/local
 	kubectl apply -k services/user-service/k8s/overlays/local
 	kubectl apply -k services/auth-service/k8s/overlays/local
