@@ -6,7 +6,7 @@ data:
   SPRING_PROFILES_ACTIVE: "default"
   SERVER_PORT: "8084"
   # Database
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.wealist-infra.svc.cluster.local:5432/noti_db"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.wealist-infra.svc.cluster.local:5432/wealist_noti_db"
   # Redis
   SPRING_DATA_REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
   SPRING_DATA_REDIS_PORT: "6379"

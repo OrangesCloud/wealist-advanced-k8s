@@ -7,6 +7,11 @@ data:
   PORT: "8003"
   SERVER_BASE_PATH: "/api/video"
   LOG_LEVEL: "debug"
+  # Database
+  DB_HOST: "postgres.wealist-infra.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "wealist_video_db"
+  # Redis
   REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
   REDIS_PORT: "6379"
   AUTH_SERVICE_URL: "http://auth-service:8090"

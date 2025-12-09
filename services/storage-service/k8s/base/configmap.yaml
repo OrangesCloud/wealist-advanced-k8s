@@ -10,3 +10,11 @@ data:
   LOG_LEVEL: "info"
   AUTH_API_BASE_URL: "http://auth-service:8081"
   CORS_ALLOWED_ORIGINS: "*"
+  # Database
+  DB_HOST: "postgres.wealist-infra.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "wealist_storage_db"
+  # S3/MinIO
+  S3_REGION: "ap-northeast-2"
+  S3_BUCKET: "wealist-files"
+  S3_ENDPOINT: "http://minio:9000"
