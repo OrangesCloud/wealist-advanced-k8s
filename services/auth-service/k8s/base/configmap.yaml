@@ -6,9 +6,9 @@ data:
   SPRING_PROFILES_ACTIVE: "default"
   SERVER_PORT: "8081"
   # Database
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/auth_db"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.wealist-infra.svc.cluster.local:5432/auth_db"
   # Redis
-  SPRING_DATA_REDIS_HOST: "redis"
+  SPRING_DATA_REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
   SPRING_DATA_REDIS_PORT: "6379"
   # Service URLs
   USER_SERVICE_URL: "http://user-service:8080"

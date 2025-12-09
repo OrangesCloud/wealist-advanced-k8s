@@ -5,16 +5,17 @@ namespace: wealist-prod
 
 resources:
   - ../../base
-  - external-postgres.yaml
-  - external-redis.yaml
 
 patches:
   - target:
       kind: Namespace
-      name: wealist
+      name: wealist-infra
     patch: |-
       - op: replace
         path: /metadata/name
+        value: wealist-prod
+      - op: replace
+        path: /metadata/labels/app.kubernetes.io~1name
         value: wealist-prod
   # Remove internal postgres/redis in EKS (use external services)
   - target:
@@ -35,3 +36,27 @@ patches:
       kind: StatefulSet
       metadata:
         name: redis
+  # Replace internal postgres Service with ExternalName service
+  - target:
+      kind: Service
+      name: postgres
+    patch: |-
+      - op: replace
+        path: /spec
+        value:
+          type: ExternalName
+          externalName: ${RDS_ENDPOINT}
+          ports:
+            - port: 5432
+  # Replace internal redis Service with ExternalName service
+  - target:
+      kind: Service
+      name: redis
+    patch: |-
+      - op: replace
+        path: /spec
+        value:
+          type: ExternalName
+          externalName: ${ELASTICACHE_ENDPOINT}
+          ports:
+            - port: 6379
