@@ -13,7 +13,7 @@ images:
 
 replicas:
   - name: board-service
-    count: 1
+    count: 2
 
 patches:
   # ConfigMap 패치 - Local 개발 환경 설정
