@@ -5,7 +5,7 @@ import { ChevronLeft, X } from 'lucide-react';
 import { useChatWebSocket } from '../../hooks/useChatWebsocket';
 import { getMessages, updateLastRead, getChat } from '../../api/chatService';
 import { getWorkspaceMembers } from '../../api/userService';
-import type { Message } from '../../types/chat';
+import type { Message, Chat } from '../../types/chat';
 import type { WorkspaceMemberResponse } from '../../types/user';
 
 interface ChatPanelProps {
@@ -34,11 +34,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
   }, [members]);
 
   // WebSocket 연결
-  const {
-    sendMessage,
-    sendTyping,
-    // isConnected
-  } = useChatWebSocket({
+  const { sendMessage, sendTyping, isConnected } = useChatWebSocket({
     chatId,
     onMessage: (event) => {
       console.log('🔊 [ChatPanel] 이벤트 수신:', event);
@@ -71,18 +67,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ chatId, onClose, onBack })
           // 🔥 Optimistic UI 메시지 대체: 내 메시지이고 같은 내용이면 temp 메시지 교체
           if (newMessage.isMine) {
             const tempIndex = prev.findIndex(
-              (m) =>
-                m.messageId.startsWith('temp-') &&
-                m.content === newMessage.content &&
-                m.userId === newMessage.userId,
+              (m) => m.messageId.startsWith('temp-') && m.content === newMessage.content && m.userId === newMessage.userId
             );
             if (tempIndex !== -1) {
-              console.log(
-                '✅ [ChatPanel] Optimistic 메시지 대체:',
-                prev[tempIndex].messageId,
-                '→',
-                newMessage.messageId,
-              );
+              console.log('✅ [ChatPanel] Optimistic 메시지 대체:', prev[tempIndex].messageId, '→', newMessage.messageId);
               const updated = [...prev];
               updated[tempIndex] = newMessage;
               return updated;

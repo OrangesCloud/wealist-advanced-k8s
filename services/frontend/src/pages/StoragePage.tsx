@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import MainLayout from '../components/layout/MainLayout';
 import { StorageSidebar } from '../components/storage/StorageSidebar';
 import { StorageHeader } from '../components/storage/StorageHeader';
@@ -60,7 +61,7 @@ type NavigationSection = 'my-drive' | 'shared' | 'recent' | 'starred' | 'trash';
 const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const currentWorkspaceId = workspaceId || '';
-  // const { theme } = useTheme();
+  const { theme } = useTheme();
 
   // 파일 입력 ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -81,7 +82,7 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   const [activeSection, setActiveSection] = useState<NavigationSection>('my-drive');
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [breadcrumbs, setBreadcrumbs] = useState<BreadcrumbItem[]>([
-    { id: null, name: '내 드라이브', path: '/' },
+    { id: null, name: '내 드라이브', path: '/' }
   ]);
 
   // 데이터 상태
@@ -104,9 +105,7 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   const [previewFile, setPreviewFile] = useState<StorageFile | null>(null);
 
   // 업로드 상태
-  const [uploadProgress, setUploadProgress] = useState<{ fileName: string; progress: number }[]>(
-    [],
-  );
+  const [uploadProgress, setUploadProgress] = useState<{ fileName: string; progress: number }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   // 사이드바 접기 상태
@@ -142,13 +141,13 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
           break;
 
         case 'recent':
-          const recentFiles = await getRecentFiles(currentWorkspaceId);
+          const recentFiles = await getRecentFiles(currentWorkspaceId, 50);
           setFolders([]);
           setFiles(recentFiles);
           break;
 
         case 'starred':
-          const starredItems = await getStarredItems();
+          const starredItems = await getStarredItems(currentWorkspaceId);
           setFolders(starredItems.folders || []);
           setFiles(starredItems.files || []);
           break;
@@ -186,32 +185,32 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
     // 브레드크럼 초기화
     const sectionNames: Record<NavigationSection, string> = {
       'my-drive': '내 드라이브',
-      shared: '공유 항목',
-      recent: '최근 항목',
-      starred: '중요 항목',
-      trash: '휴지통',
+      'shared': '공유 항목',
+      'recent': '최근 항목',
+      'starred': '중요 항목',
+      'trash': '휴지통',
     };
     setBreadcrumbs([{ id: null, name: sectionNames[section], path: '/' }]);
   }, []);
 
   // 폴더 열기
-  const handleFolderOpen = useCallback(
-    (folder: StorageFolder) => {
-      if (activeSection === 'trash') return; // 휴지통에서는 폴더 열기 불가
+  const handleFolderOpen = useCallback((folder: StorageFolder) => {
+    if (activeSection === 'trash') return; // 휴지통에서는 폴더 열기 불가
 
-      setCurrentFolderId(folder.id);
-      setBreadcrumbs((prev) => [...prev, { id: folder.id, name: folder.name, path: folder.path }]);
-    },
-    [activeSection],
-  );
+    setCurrentFolderId(folder.id);
+    setBreadcrumbs(prev => [
+      ...prev,
+      { id: folder.id, name: folder.name, path: folder.path }
+    ]);
+  }, [activeSection]);
 
   // 브레드크럼 네비게이션
   const handleBreadcrumbClick = useCallback((item: BreadcrumbItem) => {
     setCurrentFolderId(item.id);
 
     // 클릭한 항목까지만 브레드크럼 유지
-    setBreadcrumbs((prev) => {
-      const index = prev.findIndex((b) => b.id === item.id);
+    setBreadcrumbs(prev => {
+      const index = prev.findIndex(b => b.id === item.id);
       return prev.slice(0, index + 1);
     });
   }, []);
@@ -232,44 +231,38 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   }, []);
 
   // 새 폴더 생성
-  const handleCreateFolder = useCallback(
-    async (name: string, color?: string) => {
-      try {
-        await createFolder({
-          workspaceId: currentWorkspaceId,
-          parentId: currentFolderId || undefined,
-          name,
-          color,
-        });
-        setShowNewFolderModal(false);
-        loadContents();
-      } catch (err: any) {
-        setError('폴더 생성에 실패했습니다.');
-      }
-    },
-    [currentWorkspaceId, currentFolderId, loadContents],
-  );
+  const handleCreateFolder = useCallback(async (name: string, color?: string) => {
+    try {
+      await createFolder({
+        workspaceId: currentWorkspaceId,
+        parentId: currentFolderId || undefined,
+        name,
+        color,
+      });
+      setShowNewFolderModal(false);
+      loadContents();
+    } catch (err: any) {
+      setError('폴더 생성에 실패했습니다.');
+    }
+  }, [currentWorkspaceId, currentFolderId, loadContents]);
 
   // 이름 변경
-  const handleRename = useCallback(
-    async (newName: string) => {
-      if (!renameTarget) return;
+  const handleRename = useCallback(async (newName: string) => {
+    if (!renameTarget) return;
 
-      try {
-        if (renameTarget.type === 'folder') {
-          await updateFolder(renameTarget.id, { name: newName });
-        } else {
-          await updateFile(renameTarget.id, { name: newName });
-        }
-        setShowRenameModal(false);
-        setRenameTarget(null);
-        loadContents();
-      } catch (err: any) {
-        setError('이름 변경에 실패했습니다.');
+    try {
+      if (renameTarget.type === 'folder') {
+        await updateFolder(renameTarget.id, { name: newName });
+      } else {
+        await updateFile(renameTarget.id, { name: newName });
       }
-    },
-    [renameTarget, loadContents],
-  );
+      setShowRenameModal(false);
+      setRenameTarget(null);
+      loadContents();
+    } catch (err: any) {
+      setError('이름 변경에 실패했습니다.');
+    }
+  }, [renameTarget, loadContents]);
 
   // 삭제
   const handleDelete = useCallback(async () => {
@@ -322,31 +315,35 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   }, [currentWorkspaceId, loadContents]);
 
   // 파일 업로드
-  const handleFileUpload = useCallback(
-    async (files: FileList) => {
-      if (!files.length) return;
+  const handleFileUpload = useCallback(async (files: FileList) => {
+    if (!files.length) return;
 
-      setIsUploading(true);
-      const uploadList = Array.from(files);
-      setUploadProgress(uploadList.map((f) => ({ fileName: f.name, progress: 0 })));
+    setIsUploading(true);
+    const uploadList = Array.from(files);
+    setUploadProgress(uploadList.map(f => ({ fileName: f.name, progress: 0 })));
 
-      try {
-        for (let i = 0; i < uploadList.length; i++) {
-          const file = uploadList[i];
-          await uploadFile(file, currentWorkspaceId, currentFolderId || undefined, (progress) => {
-            setUploadProgress((prev) => prev.map((p, idx) => (idx === i ? { ...p, progress } : p)));
-          });
-        }
-        loadContents();
-      } catch (err: any) {
-        setError('파일 업로드에 실패했습니다.');
-      } finally {
-        setIsUploading(false);
-        setUploadProgress([]);
+    try {
+      for (let i = 0; i < uploadList.length; i++) {
+        const file = uploadList[i];
+        await uploadFile(
+          file,
+          currentWorkspaceId,
+          currentFolderId || undefined,
+          (progress) => {
+            setUploadProgress(prev =>
+              prev.map((p, idx) => idx === i ? { ...p, progress } : p)
+            );
+          }
+        );
       }
-    },
-    [currentWorkspaceId, currentFolderId, loadContents],
-  );
+      loadContents();
+    } catch (err: any) {
+      setError('파일 업로드에 실패했습니다.');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress([]);
+    }
+  }, [currentWorkspaceId, currentFolderId, loadContents]);
 
   // 파일 선택 트리거
   const triggerFileUpload = useCallback(() => {
@@ -354,16 +351,13 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   }, []);
 
   // 드래그앤드롭 핸들러
-  const handleDragEnter = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (activeSection !== 'trash' && activeSection !== 'shared') {
-        setIsDragging(true);
-      }
-    },
-    [activeSection],
-  );
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (activeSection !== 'trash' && activeSection !== 'shared') {
+      setIsDragging(true);
+    }
+  }, [activeSection]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -380,58 +374,49 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
     e.stopPropagation();
   }, []);
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-      if (activeSection === 'trash' || activeSection === 'shared') {
-        return;
-      }
+    if (activeSection === 'trash' || activeSection === 'shared') {
+      return;
+    }
 
-      const files = e.dataTransfer.files;
-      if (files && files.length > 0) {
-        handleFileUpload(files);
-      }
-    },
-    [activeSection, handleFileUpload],
-  );
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleFileUpload(files);
+    }
+  }, [activeSection, handleFileUpload]);
 
   // 검색
-  const handleSearch = useCallback(
-    async (query: string) => {
-      if (!query.trim()) {
-        loadContents();
-        return;
-      }
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      loadContents();
+      return;
+    }
 
-      setIsLoading(true);
-      try {
-        const results = await searchStorage(currentWorkspaceId, query);
-        setFolders(results.folders);
-        setFiles(results.files);
-      } catch (err: any) {
-        setError('검색에 실패했습니다.');
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [currentWorkspaceId, loadContents],
-  );
+    setIsLoading(true);
+    try {
+      const results = await searchStorage(currentWorkspaceId, query);
+      setFolders(results.folders);
+      setFiles(results.files);
+    } catch (err: any) {
+      setError('검색에 실패했습니다.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentWorkspaceId, loadContents]);
 
   // 정렬
-  const handleSort = useCallback(
-    (newSortBy: SortBy) => {
-      if (sortBy === newSortBy) {
-        setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-      } else {
-        setSortBy(newSortBy);
-        setSortDirection('asc');
-      }
-    },
-    [sortBy],
-  );
+  const handleSort = useCallback((newSortBy: SortBy) => {
+    if (sortBy === newSortBy) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(newSortBy);
+      setSortDirection('asc');
+    }
+  }, [sortBy]);
 
   // 정렬된 데이터
   const sortedFolders = [...folders].sort((a, b) => {
@@ -488,7 +473,11 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
   }, [selectedItems]);
 
   return (
-    <MainLayout onLogout={onLogout} workspaceId={currentWorkspaceId} onProfileModalOpen={() => {}}>
+    <MainLayout
+      onLogout={onLogout}
+      workspaceId={currentWorkspaceId}
+      onProfileModalOpen={() => {}}
+    >
       <div
         ref={dropZoneRef}
         className="flex h-screen bg-[#f8fafd] relative"
@@ -502,18 +491,8 @@ const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
           <div className="absolute inset-0 bg-blue-500/20 border-4 border-dashed border-blue-500 z-50 flex items-center justify-center pointer-events-none">
             <div className="bg-white rounded-xl shadow-2xl p-8 text-center">
               <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg
-                  className="w-8 h-8 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
               </div>
               <p className="text-lg font-medium text-gray-900">파일을 여기에 놓으세요</p>

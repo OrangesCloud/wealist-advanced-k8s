@@ -5,6 +5,9 @@ resources:
   - namespace.yaml
   - postgres
   - redis
+  - coturn
+  - livekit
 
-commonLabels:
-  app.kubernetes.io/part-of: wealist-infrastructure
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: wealist-infrastructure

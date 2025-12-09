@@ -30,7 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNotificationToggle,
   onVideoToggle,
   onUserMenuToggle,
-  // onStartChat,
+  onStartChat,
   totalUnreadCount = 0,
   notificationUnreadCount = 0,
   activeVideoRoomCount = 0,

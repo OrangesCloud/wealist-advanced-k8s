@@ -9,5 +9,6 @@ resources:
 
 labels:
   - pairs:
-      app.kubernetes.io/name: chat-service
+      app.kubernetes.io/name: storage-service
+      app.kubernetes.io/component: backend
       app.kubernetes.io/part-of: wealist

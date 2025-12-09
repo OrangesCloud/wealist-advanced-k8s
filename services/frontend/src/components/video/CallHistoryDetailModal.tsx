@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Download, Clock, Calendar, Users, Loader2, Check, Link } from 'lucide-react';
+import { X, Download, Clock, Calendar, Users, User, Loader2, Copy, Check, Link } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { CallHistory, videoService } from '../../api/videoService';
 import { WorkspaceMemberResponse } from '../../types/user';
@@ -115,9 +115,7 @@ export const CallHistoryDetailModal: React.FC<CallHistoryDetailModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `회의록_${history.roomName}_${
-      new Date(history.endedAt).toISOString().split('T')[0]
-    }.txt`;
+    a.download = `회의록_${history.roomName}_${new Date(history.endedAt).toISOString().split('T')[0]}.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -125,10 +123,7 @@ export const CallHistoryDetailModal: React.FC<CallHistoryDetailModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100]" onClick={onClose}>
       <div
         className={`${theme.colors.card} rounded-xl w-[480px] max-w-[95vw] max-h-[85vh] shadow-2xl flex flex-col`}
         onClick={(e) => e.stopPropagation()}
@@ -147,12 +142,8 @@ export const CallHistoryDetailModal: React.FC<CallHistoryDetailModalProps> = ({
         {/* 내용 */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* 회의명 */}
-          <div
-            className={`p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800`}
-          >
-            <h3 className="text-xl font-bold text-blue-700 dark:text-blue-300">
-              {history.roomName}
-            </h3>
+          <div className={`p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800`}>
+            <h3 className="text-xl font-bold text-blue-700 dark:text-blue-300">{history.roomName}</h3>
             {/* 회의 ID 복사 */}
             <div className="mt-2 flex items-center gap-2">
               <span className={`text-xs ${theme.colors.textSecondary}`}>
@@ -266,9 +257,7 @@ export const CallHistoryDetailModal: React.FC<CallHistoryDetailModalProps> = ({
           ) : transcript ? (
             <div className={`p-4 rounded-lg border ${theme.colors.border}`}>
               <h4 className={`font-medium ${theme.colors.text} mb-3`}>📝 회의 내용</h4>
-              <div
-                className={`p-3 rounded bg-gray-50 dark:bg-gray-800 text-sm ${theme.colors.text} whitespace-pre-wrap max-h-48 overflow-y-auto`}
-              >
+              <div className={`p-3 rounded bg-gray-50 dark:bg-gray-800 text-sm ${theme.colors.text} whitespace-pre-wrap max-h-48 overflow-y-auto`}>
                 {transcript}
               </div>
             </div>

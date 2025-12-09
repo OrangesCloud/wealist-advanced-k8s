@@ -1,252 +1,332 @@
-# weAlist 모니터링 스택 설정 가이드
+# Monitoring Setup Guide
 
-## 개요
+Wealist 프로젝트의 모니터링 시스템 구성 및 설정 가이드입니다.
 
-이 문서는 weAlist 프로젝트에 추가된 Prometheus, Loki, Grafana 기반 모니터링 스택에 대해 설명합니다.
+## 모니터링 스택 개요
 
-## 아키텍처
+| 컴포넌트 | 역할 | 로컬 포트 | 이미지 |
+|---------|------|----------|--------|
+| Prometheus | 메트릭 수집/저장 | 9090 | prom/prometheus:v2.48.0 |
+| Loki | 로그 수집/저장 | 3100 | grafana/loki:2.9.2 |
+| Promtail | Docker 로그 수집 | - | grafana/promtail:2.9.2 |
+| Grafana | 시각화 대시보드 | 3001 | grafana/grafana:10.2.2 |
+| Redis Exporter | Redis 메트릭 수집 | 9121 | oliver006/redis_exporter:v1.55.0 |
+| Postgres Exporter | PostgreSQL 메트릭 수집 | 9187 | prometheuscommunity/postgres-exporter:v0.15.0 |
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Grafana (3001)                           │
-│                    시각화 대시보드                                │
-│  - 기획자 대시보드 (DAU/MAU, 비즈니스)                           │
-│  - 개발자 대시보드 (API, 로그)                                   │
-│  - 인프라 대시보드 (서비스 상태)                                  │
-│  - DB 대시보드 (PostgreSQL, Redis)                              │
-│  - 로그 분석 대시보드 (디버깅)                                   │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-         ┌───────────────┼───────────────┬───────────────┐
-         │               │               │               │
-         ▼               ▼               ▼               ▼
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│ Prometheus  │  │    Loki     │  │   Redis     │  │  PostgreSQL │
-│   (9090)    │  │   (3100)    │  │  Exporter   │  │   Exporter  │
-│  메트릭 저장  │  │  로그 저장   │  │   (9121)    │  │   (9187)    │
-└──────┬──────┘  └──────┬──────┘  └─────────────┘  └─────────────┘
-       │                │
-       │                ▼
-       │         ┌─────────────┐
-       │         │  Promtail   │
-       │         │ Docker 로그  │
-       │         │   수집기     │
-       │         └──────┬──────┘
-       │                │
-       ▼                ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Application Services                         │
-│  user | auth | board | chat | noti | storage | video            │
-│  /metrics 엔드포인트 노출 + 비즈니스 메트릭                        │
-└─────────────────────────────────────────────────────────────────┘
+## 모니터링 시작/중지
+
+```bash
+# 모니터링 스택 시작
+./docker/scripts/monitoring.sh up [dev|prod]
+
+# 모니터링 스택 중지
+./docker/scripts/monitoring.sh down [dev|prod]
+
+# 재시작
+./docker/scripts/monitoring.sh restart [dev|prod]
+
+# 상태 확인
+./docker/scripts/monitoring.sh status [dev|prod]
+
+# 로그 확인
+./docker/scripts/monitoring.sh logs [dev|prod] [service]
 ```
 
 ## 접속 정보
 
-| 서비스 | URL | 용도 |
-|--------|-----|------|
-| **Grafana** | http://localhost:3001 | 대시보드 (admin/admin) |
-| **Prometheus** | http://localhost:9090 | 메트릭 쿼리 UI |
-| **Loki** | http://localhost:3100 | 로그 API |
-| **PostgreSQL Exporter** | http://localhost:9187 | PostgreSQL 메트릭 |
-| **Redis Exporter** | http://localhost:9121 | Redis 메트릭 |
+- **Prometheus**: http://localhost:9090
+- **Loki**: http://localhost:3100
+- **Grafana**: http://localhost:3001
+  - 기본 계정: `admin` / `admin`
 
-## 대시보드 목록
+### Grafana 데이터소스 설정
 
-| 대시보드 | 대상 | 설명 |
-|----------|------|------|
-| **기획자 대시보드** | 기획자/PM | DAU/MAU, 신규 회원, 워크스페이스, 비즈니스 KPI |
-| **인프라 대시보드** | DevOps | 서비스 상태, 에러율, Redis/DB 현황 |
-| **개발자 대시보드** | 개발자 | API 성능, 로그, 디버깅 정보 |
-| **DB 대시보드** | DBA/DevOps | PostgreSQL/Redis 상세 모니터링 |
-| **로그 분석** | 개발자 | 에러 로그 검색, 문제 API 탐지 |
-| **서비스 상세** | 개발자 | 서비스별 상세 메트릭 |
+Grafana provisioning을 통해 자동 설정되어 있습니다. 수동 설정 시:
 
-## 알림 규칙 (Alerting)
+**Prometheus 데이터소스:**
+1. Configuration > Data Sources > Add data source
+2. Prometheus 선택
+3. URL: `http://prometheus:9090`
+4. Save & Test
 
-| 알림 | 조건 | 심각도 |
-|------|------|--------|
-| 서비스 다운 | `up == 0` (1분 이상) | Critical |
-| 높은 에러율 | HTTP 5xx > 5% (2분 이상) | Warning |
-| 느린 응답 | p95 > 2초 (5분 이상) | Warning |
-| Redis 메모리 | > 200MB (5분 이상) | Warning |
-| 트래픽 급증 | RPS > 100 (2분 이상) | Info |
+**Loki 데이터소스:**
+1. Configuration > Data Sources > Add data source
+2. Loki 선택
+3. URL: `http://loki:3100`
+4. Save & Test
 
-## 추가된 파일
+## 서비스별 Metrics Endpoint
 
-### Docker Compose 설정
-- `docker/compose/docker-compose.yml` - 모니터링 서비스 추가
+### Go 서비스 (Prometheus client_golang)
 
-### 모니터링 설정 파일
+| 서비스 | Metrics Endpoint | Health Endpoint |
+|--------|------------------|-----------------|
+| board-service | `/metrics`, `/api/boards/metrics` | `/health`, `/ready` |
+| noti-service | `/metrics` | `/health`, `/ready` |
+| chat-service | - | `/health`, `/ready` |
+| user-service | - | `/health`, `/ready` |
+| storage-service | - | `/health`, `/ready` |
+| video-service | - | `/health`, `/ready` |
+
+### Spring Boot 서비스 (Micrometer)
+
+| 서비스 | Metrics Endpoint | Health Endpoint |
+|--------|------------------|-----------------|
+| auth-service | `/actuator/prometheus` | `/actuator/health/liveness`, `/actuator/health/readiness` |
+
+**auth-service Actuator 노출 엔드포인트**:
+- `/actuator/health` - 전체 헬스 상태
+- `/actuator/info` - 애플리케이션 정보
+- `/actuator/metrics` - 메트릭 목록
+- `/actuator/prometheus` - Prometheus 포맷 메트릭
+
+## board-service 메트릭 상세
+
+board-service는 포괄적인 Prometheus 메트릭을 제공합니다.
+
+### HTTP 메트릭
 ```
-docker/monitoring/
-├── prometheus/
-│   └── prometheus.yml          # 스크래핑 대상 설정
-├── loki/
-│   └── loki-config.yml         # 로그 저장 설정
-├── promtail/
-│   └── promtail-config.yml     # Docker 로그 수집 설정
-└── grafana/
-    └── provisioning/
-        ├── datasources/
-        │   └── datasources.yml # Prometheus, Loki 자동 등록
-        └── dashboards/
-            ├── dashboards.yml
-            └── json/
-                └── services-overview.json  # 기본 대시보드
-```
-
-### Go 서비스 메트릭 미들웨어
-- `services/user-service/internal/middleware/metrics.go`
-- `services/chat-service/internal/middleware/metrics.go`
-- `services/storage-service/internal/middleware/metrics.go`
-- `services/video-service/internal/middleware/metrics.go`
-
-## 수집되는 메트릭
-
-### 공통 HTTP 메트릭 (모든 Go 서비스)
-
-| 메트릭 | 타입 | 설명 |
-|--------|------|------|
-| `http_requests_total` | Counter | 총 HTTP 요청 수 (method, path, status 라벨) |
-| `http_request_duration_seconds` | Histogram | 요청 처리 시간 |
-| `http_requests_in_flight` | Gauge | 현재 처리 중인 요청 수 |
-
-### 서비스별 커스텀 메트릭
-
-**user-service (비즈니스 메트릭):**
-- `user_registrations_total` - 신규 회원 가입 수
-- `user_logins_total` - 로그인 수 (DAU/MAU 추정용)
-- `users_active_total` - 현재 동시 접속자
-- `users_registered_total` - 전체 등록 사용자 수
-- `workspaces_created_total` - 워크스페이스 생성 수
-- `workspaces_total` - 전체 워크스페이스 수
-- `workspace_members_total` - 워크스페이스별 멤버 수
-
-**board-service (비즈니스 메트릭):**
-- `board_service_projects_total` - 전체 프로젝트 수
-- `board_service_boards_total` - 전체 보드 수
-- `board_service_project_created_total` - 프로젝트 생성 수
-- `board_service_board_created_total` - 보드 생성 수
-
-**chat-service:**
-- `websocket_connections_total` - 총 WebSocket 연결 수
-- `websocket_active_connections` - 현재 활성 WebSocket 연결
-- `chat_daily_active_users` - 일일 채팅 사용자
-- `chat_messages_sent_total` - 채팅 메시지 전송 수
-- `chat_rooms_active` - 활성 채팅방 수
-
-**storage-service:**
-- `storage_upload_bytes_total` - 총 업로드 바이트
-- `storage_download_bytes_total` - 총 다운로드 바이트
-
-**video-service:**
-- `video_rooms_active` - 활성 화상회의 방 수
-- `video_participants_total` - 총 참가자 수
-- `video_participants_active` - 현재 진행 중인 참가자 수
-- `video_daily_active_users` - 일일 비디오 사용자
-- `video_calls_started_total` - 비디오 통화 시작 수
-- `video_call_duration_seconds` - 통화 시간
-
-### Spring Boot (auth-service)
-- `/actuator/prometheus` 엔드포인트
-- JVM, HTTP, 캐시 등 Spring Boot 표준 메트릭
-
-### PostgreSQL 메트릭 (postgres-exporter)
-- `pg_stat_database_*` - 데이터베이스 통계
-- `pg_stat_user_tables_*` - 테이블 통계
-- `pg_locks_*` - 락 정보
-- `pg_stat_bgwriter_*` - Background Writer 통계
-- `pg_replication_*` - 복제 상태 (해당시)
-
-### Redis 메트릭 (redis-exporter)
-- `redis_memory_used_bytes` - 메모리 사용량
-- `redis_connected_clients` - 연결된 클라이언트 수
-- `redis_commands_processed_total` - 처리된 명령 수
-- `redis_keyspace_*` - 키스페이스 정보
-- `redis_db_keys` - 키 개수
-
-## 메트릭 엔드포인트
-
-| 서비스 | 엔드포인트 |
-|--------|-----------|
-| user-service | http://localhost:8080/metrics |
-| auth-service | http://localhost:8090/actuator/prometheus |
-| board-service | http://localhost:8000/metrics |
-| chat-service | http://localhost:8001/metrics |
-| noti-service | http://localhost:8002/metrics |
-| storage-service | http://localhost:8003/metrics |
-| video-service | http://localhost:8004/metrics |
-
-## 사용법
-
-### 개발 환경 시작
-```bash
-./docker/scripts/dev.sh up
+board_service_http_requests_total{method, endpoint, status}
+board_service_http_request_duration_seconds{method, endpoint}
 ```
 
-### Grafana 대시보드 접속
-1. http://localhost:3001 접속
-2. admin / admin 으로 로그인
-3. Dashboards → weAlist → Services Overview 선택
+### 데이터베이스 메트릭
+```
+# Connection Pool
+board_service_db_connections_open
+board_service_db_connections_in_use
+board_service_db_connections_idle
+board_service_db_connections_max
+board_service_db_connection_wait_total
+board_service_db_connection_wait_duration_seconds_total
 
-### Prometheus 쿼리 예시
-```promql
-# 서비스별 초당 요청 수
-sum(rate(http_requests_total[5m])) by (job)
-
-# 95 퍼센타일 응답 시간
-histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le, job))
-
-# 에러율
-sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))
+# Query Performance
+board_service_db_query_duration_seconds{operation, table}
+board_service_db_query_errors_total{operation, table}
 ```
 
-### Loki 로그 쿼리 예시 (Grafana Explore)
+### 외부 API 메트릭
+```
+board_service_external_api_request_duration_seconds{endpoint, status}
+board_service_external_api_requests_total{endpoint, method, status}
+board_service_external_api_errors_total{endpoint, error_type}
+```
+
+### 비즈니스 메트릭
+```
+board_service_projects_total
+board_service_boards_total
+board_service_project_created_total
+board_service_board_created_total
+```
+
+## Prometheus 설정
+
+### 스크래핑 대상 설정 예시
+
+```yaml
+scrape_configs:
+  - job_name: 'board-service'
+    static_configs:
+      - targets: ['board-service:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8090']
+    metrics_path: '/actuator/prometheus'
+
+  - job_name: 'noti-service'
+    static_configs:
+      - targets: ['noti-service:8002']
+    metrics_path: '/metrics'
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+```
+
+## Exporter 구성
+
+### Redis Exporter
+- 이미지: `oliver006/redis_exporter`
+- 포트: 9121
+- Redis 연결: `redis://redis:6379`
+
+### Postgres Exporter
+- 이미지: `prometheuscommunity/postgres-exporter`
+- 포트: 9187
+- PostgreSQL 연결: `postgres://user:password@postgres:5432/db`
+
+### Node Exporter
+- 이미지: `prom/node-exporter`
+- 포트: 9100
+- 호스트 시스템 메트릭 수집
+
+## Loki 로그 수집
+
+Loki + Promtail을 통해 모든 Docker 컨테이너 로그를 수집합니다.
+
+### 아키텍처
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  Services   │───▶│   Docker    │───▶│  Promtail   │───▶│    Loki     │
+│  (logs)     │    │  json-file  │    │  (collector)│    │  (storage)  │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                                                                │
+                                                                ▼
+                                                         ┌─────────────┐
+                                                         │   Grafana   │
+                                                         │  (query)    │
+                                                         └─────────────┘
+```
+
+### Promtail 설정
+
+Promtail은 Docker 소켓을 통해 컨테이너 로그를 수집합니다:
+
+```yaml
+# docker/monitoring/promtail/promtail-config.yml
+server:
+  http_listen_port: 9080
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: containerlogs
+          __path__: /var/lib/docker/containers/*/*log
+    pipeline_stages:
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            attrs:
+      - labels:
+          stream:
+      - output:
+          source: output
+```
+
+### Grafana에서 로그 조회
+
+1. Explore 메뉴 선택
+2. 데이터소스: Loki 선택
+3. Label browser에서 필터링:
+   - `container_name`: 특정 컨테이너
+   - `job`: containerlogs
+
+#### 유용한 LogQL 쿼리
+
 ```logql
 # 특정 서비스 로그
-{compose_service="user-service"}
+{container_name="wealist-board-service"}
 
-# 에러 로그만
-{compose_service=~".+"} |= "error"
+# 에러 로그만 필터
+{container_name=~"wealist-.*"} |= "error"
 
-# JSON 필드 추출
-{compose_service="board-service"} | json | level="error"
+# JSON 로그 파싱
+{container_name="wealist-board-service"} | json | level="error"
+
+# 최근 5분간 에러 카운트
+count_over_time({container_name=~"wealist-.*"} |= "error" [5m])
 ```
 
-## 데이터 보관 기간
+### 서비스 로깅 설정
 
-- **Prometheus**: 7일 (docker-compose에서 설정)
-- **Loki**: 7일 (loki-config.yml에서 설정)
-- **Grafana**: 영구 저장 (grafana-data 볼륨)
+모든 서비스는 json-file 드라이버를 사용하며 Promtail이 수집합니다:
 
-## 의존성 추가
-
-### Go 서비스
-```go
-// go.mod에 추가됨
-github.com/prometheus/client_golang v1.18.0
+```yaml
+# docker-compose.yml
+logging:
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
 ```
 
-### Spring Boot (auth-service)
-```gradle
-// build.gradle에 이미 포함됨
-implementation 'io.micrometer:micrometer-registry-prometheus'
+## 알림 설정 (Alertmanager)
+
+추후 Alertmanager 구성 시 다음 알림 규칙 권장:
+
+### 서비스 다운 알림
+```yaml
+groups:
+  - name: service-alerts
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+```
+
+### 고지연 알림
+```yaml
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(board_service_http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency detected in board-service"
 ```
 
 ## 트러블슈팅
 
-### Prometheus에서 타겟이 DOWN으로 표시될 때
-1. http://localhost:9090/targets 접속
-2. 에러 메시지 확인
-3. 해당 서비스가 실행 중인지 확인
+### Prometheus가 타겟에 연결하지 못할 때
+```bash
+# 네트워크 확인
+docker network ls
+docker network inspect wealist-backend-net
 
-### Grafana에서 데이터가 보이지 않을 때
-1. 데이터소스 연결 확인 (Configuration → Data Sources)
-2. 시간 범위 확인 (우측 상단)
-3. 쿼리 직접 테스트 (Explore 메뉴)
+# 서비스 상태 확인
+curl http://localhost:8000/metrics
+curl http://localhost:8090/actuator/prometheus
 
-### 로그가 수집되지 않을 때
-1. Promtail 컨테이너 로그 확인: `docker logs wealist-promtail`
-2. Docker 소켓 마운트 확인
-3. Loki 연결 상태 확인
+# Prometheus 타겟 상태 확인
+curl http://localhost:9090/api/v1/targets
+```
+
+### Loki 로그가 수집되지 않을 때
+```bash
+# Promtail 상태 확인
+docker logs wealist-promtail
+
+# Loki 상태 확인
+curl http://localhost:3100/ready
+
+# Loki 레이블 확인
+curl http://localhost:3100/loki/api/v1/labels
+```
+
+### Grafana 데이터소스 연결 실패
+1. Prometheus/Loki 컨테이너 실행 확인
+2. 네트워크 동일한지 확인 (wealist-monitoring-net)
+3. URL을 컨테이너 이름으로 설정:
+   - Prometheus: `http://prometheus:9090`
+   - Loki: `http://loki:3100`
+
+### 모니터링 스택 전체 재시작
+```bash
+docker compose -f docker/compose/docker-compose.yml restart prometheus loki promtail grafana redis-exporter postgres-exporter
+```

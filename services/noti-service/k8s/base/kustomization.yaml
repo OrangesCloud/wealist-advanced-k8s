@@ -7,6 +7,7 @@ resources:
   - configmap.yaml
   - secret.yaml
 
-commonLabels:
-  app.kubernetes.io/name: noti-service
-  app.kubernetes.io/part-of: wealist
+labels:
+  - pairs:
+      app.kubernetes.io/name: noti-service
+      app.kubernetes.io/part-of: wealist

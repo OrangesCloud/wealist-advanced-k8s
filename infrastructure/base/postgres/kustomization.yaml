@@ -7,6 +7,7 @@ resources:
   - secret.yaml
   - configmap.yaml
 
-commonLabels:
-  app.kubernetes.io/name: postgres
-  app.kubernetes.io/part-of: wealist
+labels:
+  - pairs:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/part-of: wealist

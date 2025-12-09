@@ -8,6 +8,7 @@ resources:
   - secret.yaml
   - ingress.yaml
 
-commonLabels:
-  app.kubernetes.io/name: board-service
-  app.kubernetes.io/part-of: wealist
+labels:
+  - pairs:
+      app.kubernetes.io/name: board-service
+      app.kubernetes.io/part-of: wealist

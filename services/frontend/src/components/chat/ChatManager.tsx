@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { ChatListDropdown } from './ChatListDropdown';
+import { ChatPanel } from './chatPanel';
 import { getMyChats } from '../../api/chatService';
 import type { Chat } from '../../types/chat';
-import { ChatPanel } from './ChatPanel';
 
 interface ChatManagerProps {
   workspaceId: string;

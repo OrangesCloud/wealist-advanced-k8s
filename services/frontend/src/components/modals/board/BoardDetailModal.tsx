@@ -129,7 +129,7 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
 
   // Meeting history modal state
   const [selectedMeeting, setSelectedMeeting] = useState<CallHistory | null>(null);
-  const [_isLoadingMeeting, setIsLoadingMeeting] = useState(false);
+  const [isLoadingMeeting, setIsLoadingMeeting] = useState(false);
 
   // 회의 링크 클릭 처리
   const handleMeetingClick = async (meetingId: string) => {
@@ -342,10 +342,11 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
               <label className="block text-sm font-semibold text-gray-700 mb-2">설명</label>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">
                 {boardData.content ? (
-                  <MeetingLinkText text={boardData.content} onMeetingClick={handleMeetingClick} />
-                ) : (
-                  '설명이 없습니다.'
-                )}
+                  <MeetingLinkText
+                    text={boardData.content}
+                    onMeetingClick={handleMeetingClick}
+                  />
+                ) : '설명이 없습니다.'}
               </p>
               {/* 보드 첨부파일 다운로드 (기존 UI 개선) */}
               <div
@@ -475,9 +476,7 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
                 {assigneeMember ? (
                   <div className="flex items-center gap-2">
                     <AvatarStack members={[assigneeMember]} />
-                    <span className="text-sm">
-                      {assigneeMember.nickName || assigneeMember.userEmail || 'Unknown'}
-                    </span>
+                    <span className="text-sm">{assigneeMember.nickName || assigneeMember.userEmail || 'Unknown'}</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">할당되지 않음</span>
@@ -603,7 +602,7 @@ export const BoardDetailModal: React.FC<BoardDetailModalProps> = ({
         <CallHistoryDetailModal
           history={selectedMeeting}
           onClose={() => setSelectedMeeting(null)}
-          memberMap={new Map(workspaceMembers.map((m) => [m.userId, m]))}
+          memberMap={new Map(workspaceMembers.map(m => [m.userId, m]))}
         />
       )}
     </Portal>

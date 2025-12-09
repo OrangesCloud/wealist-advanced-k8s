@@ -8,6 +8,7 @@ import {
   PhoneOff,
   Users,
   Monitor,
+  Settings,
   MessageSquare,
   Copy,
   Check,
@@ -20,6 +21,7 @@ import {
   FlipHorizontal,
   Sparkles,
 } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { VideoRoom as VideoRoomType, videoService } from '../../api/videoService';
 
 // Display mode types
@@ -120,7 +122,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   onLeave,
   userProfile,
 }) => {
-  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const { theme } = useTheme();
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>('connecting');
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false); // 기본적으로 카메라 OFF
@@ -129,7 +133,7 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   const [isBlurEnabled, setIsBlurEnabled] = useState(false); // 배경 흐림 효과
   const [showParticipants, setShowParticipants] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [error, _setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Chat state
   const [showChat, setShowChat] = useState(false);
@@ -230,11 +234,11 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   const refreshParticipants = useCallback(async () => {
     try {
       const roomParticipants = await videoService.getParticipants(room.id);
-      const activeParticipants = roomParticipants.filter((p) => p.isActive);
+      const activeParticipants = roomParticipants.filter(p => p.isActive);
 
       // 새로운 참여자 확인 (로컬 제외)
-      const currentIds = new Set(activeParticipants.map((p) => p.id));
-      activeParticipants.forEach((p) => {
+      const currentIds = new Set(activeParticipants.map(p => p.id));
+      activeParticipants.forEach(p => {
         if (!previousParticipantIds.current.has(p.id) && p.userId !== userProfile?.id) {
           // userId의 앞 6자리만 표시
           const shortName = `사용자 ${p.userId.slice(0, 6)}`;
@@ -244,11 +248,11 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       previousParticipantIds.current = currentIds;
 
       // 참여자 목록 업데이트 (로컬 참여자 유지)
-      setParticipants((prev) => {
-        const localParticipant = prev.find((p) => p.isLocal);
+      setParticipants(prev => {
+        const localParticipant = prev.find(p => p.isLocal);
         const remoteParticipants: Participant[] = activeParticipants
-          .filter((p) => p.userId !== userProfile?.id)
-          .map((p) => ({
+          .filter(p => p.userId !== userProfile?.id)
+          .map(p => ({
             identity: p.id,
             name: `참여자 ${p.userId.slice(0, 6)}`,
             isSpeaking: false,
@@ -259,7 +263,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
             audioTrack: undefined,
           }));
 
-        return localParticipant ? [localParticipant, ...remoteParticipants] : remoteParticipants;
+        return localParticipant
+          ? [localParticipant, ...remoteParticipants]
+          : remoteParticipants;
       });
     } catch (error) {
       console.error('Failed to refresh participants:', error);
@@ -294,7 +300,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       if (audioTrack) {
         audioTrack.enabled = isMuted;
         setIsMuted(!isMuted);
-        setParticipants((prev) => prev.map((p) => (p.isLocal ? { ...p, isMuted: !isMuted } : p)));
+        setParticipants((prev) =>
+          prev.map((p) => (p.isLocal ? { ...p, isMuted: !isMuted } : p))
+        );
       }
     }
   };
@@ -323,7 +331,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
 
         setIsVideoEnabled(true);
         setParticipants((prev) =>
-          prev.map((p) => (p.isLocal ? { ...p, isVideoEnabled: true, videoTrack } : p)),
+          prev.map((p) =>
+            p.isLocal ? { ...p, isVideoEnabled: true, videoTrack } : p
+          )
         );
       } catch (err) {
         console.error('Failed to enable video:', err);
@@ -340,7 +350,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
       }
       setIsVideoEnabled(false);
       setParticipants((prev) =>
-        prev.map((p) => (p.isLocal ? { ...p, isVideoEnabled: false, videoTrack: undefined } : p)),
+        prev.map((p) =>
+          p.isLocal ? { ...p, isVideoEnabled: false, videoTrack: undefined } : p
+        )
       );
     }
   };
@@ -384,7 +396,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
   };
 
   const copyRoomLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/video/${room.id}`);
+    navigator.clipboard.writeText(
+      `${window.location.origin}/video/${room.id}`
+    );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -621,116 +635,116 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           }}
         >
           {/* Mini mode header - draggable */}
-          <div
-            className="flex items-center justify-between px-3 py-2 bg-gray-800 cursor-grab active:cursor-grabbing"
-            onMouseDown={handleDragStart}
-          >
-            <div className="flex items-center gap-2 flex-1">
-              <GripHorizontal className="w-4 h-4 text-gray-500" />
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  connectionState === 'connected'
-                    ? 'bg-green-500'
-                    : connectionState === 'connecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-red-500'
-                }`}
-              />
-              <span className="text-white text-sm font-medium truncate flex-1">{room.name}</span>
-            </div>
-            <button
-              onClick={toggleDisplayMode}
-              className="p-1 rounded hover:bg-gray-700 text-white transition"
-              title="전체 화면"
-            >
-              <Maximize2 className="w-4 h-4" />
-            </button>
+        <div
+          className="flex items-center justify-between px-3 py-2 bg-gray-800 cursor-grab active:cursor-grabbing"
+          onMouseDown={handleDragStart}
+        >
+          <div className="flex items-center gap-2 flex-1">
+            <GripHorizontal className="w-4 h-4 text-gray-500" />
+            <div
+              className={`w-2 h-2 rounded-full ${
+                connectionState === 'connected'
+                  ? 'bg-green-500'
+                  : connectionState === 'connecting'
+                  ? 'bg-yellow-500 animate-pulse'
+                  : 'bg-red-500'
+              }`}
+            />
+            <span className="text-white text-sm font-medium truncate flex-1">
+              {room.name}
+            </span>
           </div>
+          <button
+            onClick={toggleDisplayMode}
+            className="p-1 rounded hover:bg-gray-700 text-white transition"
+            title="전체 화면"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        </div>
 
-          {/* Mini video view */}
-          <div className="relative flex-1" style={{ height: 'calc(100% - 88px)' }}>
-            <video
-              ref={localVideoRef}
-              autoPlay
-              muted
-              playsInline
-              className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+        {/* Mini video view */}
+        <div className="relative flex-1" style={{ height: 'calc(100% - 88px)' }}>
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className={`w-full h-full object-cover ${!isVideoEnabled ? 'hidden' : ''}`}
+            style={{
+              transform: isMirrored ? 'scaleX(-1)' : 'none',
+              filter: isBlurEnabled ? 'blur(0px)' : 'none',
+            }}
+          />
+          {/* 배경 흐림 효과 오버레이 (간단 버전) */}
+          {isBlurEnabled && isVideoEnabled && (
+            <div
+              className="absolute inset-0 pointer-events-none"
               style={{
-                transform: isMirrored ? 'scaleX(-1)' : 'none',
-                filter: isBlurEnabled ? 'blur(0px)' : 'none',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                maskImage: 'radial-gradient(ellipse 40% 60% at 50% 40%, transparent 30%, black 70%)',
+                WebkitMaskImage: 'radial-gradient(ellipse 40% 60% at 50% 40%, transparent 30%, black 70%)',
               }}
             />
-            {/* 배경 흐림 효과 오버레이 (간단 버전) */}
-            {isBlurEnabled && isVideoEnabled && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backdropFilter: 'blur(8px)',
-                  WebkitBackdropFilter: 'blur(8px)',
-                  maskImage:
-                    'radial-gradient(ellipse 40% 60% at 50% 40%, transparent 30%, black 70%)',
-                  WebkitMaskImage:
-                    'radial-gradient(ellipse 40% 60% at 50% 40%, transparent 30%, black 70%)',
-                }}
-              />
-            )}
-            {!isVideoEnabled && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-                {userProfile?.profileImageUrl ? (
-                  <img
-                    src={userProfile.profileImageUrl}
-                    alt={userProfile.nickName}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-gray-600"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white border-2 border-gray-600">
-                    {userProfile?.nickName?.[0]?.toUpperCase() || '나'}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Participant count badge */}
-            <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 rounded-full flex items-center gap-1">
-              <Users className="w-3 h-3 text-white" />
-              <span className="text-white text-xs">{participants.length}</span>
+          )}
+          {!isVideoEnabled && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              {userProfile?.profileImageUrl ? (
+                <img
+                  src={userProfile.profileImageUrl}
+                  alt={userProfile.nickName}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-gray-600"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white border-2 border-gray-600">
+                  {userProfile?.nickName?.[0]?.toUpperCase() || '나'}
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Mini controls */}
-          <div className="flex items-center justify-center gap-2 py-2 bg-gray-800">
-            <button
-              onClick={toggleMute}
-              className={`p-2 rounded-full transition ${
-                isMuted
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
-              }`}
-              title={isMuted ? '마이크 켜기' : '마이크 끄기'}
-            >
-              {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={toggleVideo}
-              className={`p-2 rounded-full transition ${
-                !isVideoEnabled
-                  ? 'bg-red-500 hover:bg-red-600 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'
-              }`}
-              title={isVideoEnabled ? '카메라 끄기' : '카메라 켜기'}
-            >
-              {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
-            </button>
-
-            <button
-              onClick={handleLeave}
-              className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
-              title="통화 종료"
-            >
-              <PhoneOff className="w-4 h-4" />
-            </button>
+          )}
+          {/* Participant count badge */}
+          <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 rounded-full flex items-center gap-1">
+            <Users className="w-3 h-3 text-white" />
+            <span className="text-white text-xs">{participants.length}</span>
           </div>
         </div>
+
+        {/* Mini controls */}
+        <div className="flex items-center justify-center gap-2 py-2 bg-gray-800">
+          <button
+            onClick={toggleMute}
+            className={`p-2 rounded-full transition ${
+              isMuted
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            }`}
+            title={isMuted ? '마이크 켜기' : '마이크 끄기'}
+          >
+            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={toggleVideo}
+            className={`p-2 rounded-full transition ${
+              !isVideoEnabled
+                ? 'bg-red-500 hover:bg-red-600 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
+            }`}
+            title={isVideoEnabled ? '카메라 끄기' : '카메라 켜기'}
+          >
+            {isVideoEnabled ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+          </button>
+
+          <button
+            onClick={handleLeave}
+            className="p-2 rounded-full bg-red-500 hover:bg-red-600 text-white transition"
+            title="통화 종료"
+          >
+            <PhoneOff className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
       </>
     );
   }
@@ -761,7 +775,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
             }`}
           />
           <h1 className="text-white font-medium">{room.name}</h1>
-          <span className="text-gray-400 text-sm">({participants.length}명 참여중)</span>
+          <span className="text-gray-400 text-sm">
+            ({participants.length}명 참여중)
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -775,7 +791,11 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
             onClick={copyRoomLink}
             className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded-lg text-white text-sm transition"
           >
-            {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+            {copied ? (
+              <Check className="w-4 h-4 text-green-500" />
+            ) : (
+              <Copy className="w-4 h-4" />
+            )}
             {copied ? '복사됨!' : '초대 링크'}
           </button>
           <button
@@ -792,7 +812,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           <button
             onClick={() => setShowChat(!showChat)}
             className={`p-2 rounded-lg transition relative ${
-              showChat ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600 text-white'
+              showChat
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 hover:bg-gray-600 text-white'
             }`}
             title="채팅"
           >
@@ -845,10 +867,8 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
                       style={{
                         backdropFilter: 'blur(10px)',
                         WebkitBackdropFilter: 'blur(10px)',
-                        maskImage:
-                          'radial-gradient(ellipse 35% 50% at 50% 35%, transparent 40%, black 80%)',
-                        WebkitMaskImage:
-                          'radial-gradient(ellipse 35% 50% at 50% 35%, transparent 40%, black 80%)',
+                        maskImage: 'radial-gradient(ellipse 35% 50% at 50% 35%, transparent 40%, black 80%)',
+                        WebkitMaskImage: 'radial-gradient(ellipse 35% 50% at 50% 35%, transparent 40%, black 80%)',
                       }}
                     />
                   )}
@@ -886,7 +906,9 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
                     {participant.isLocal && ' (나)'}
                   </span>
                   <div className="flex items-center gap-1">
-                    {participant.isMuted && <MicOff className="w-4 h-4 text-red-500" />}
+                    {participant.isMuted && (
+                      <MicOff className="w-4 h-4 text-red-500" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -956,12 +978,18 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
                     className={`flex flex-col ${msg.isLocal ? 'items-end' : 'items-start'}`}
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs text-gray-400">{msg.senderName}</span>
-                      <span className="text-xs text-gray-500">{formatChatTime(msg.timestamp)}</span>
+                      <span className="text-xs text-gray-400">
+                        {msg.senderName}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {formatChatTime(msg.timestamp)}
+                      </span>
                     </div>
                     <div
                       className={`max-w-[80%] px-3 py-2 rounded-lg text-sm ${
-                        msg.isLocal ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'
+                        msg.isLocal
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-white'
                       }`}
                     >
                       {msg.message}
@@ -1016,7 +1044,11 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           }`}
           title={isMuted ? '마이크 켜기' : '마이크 끄기'}
         >
-          {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+          {isMuted ? (
+            <MicOff className="w-6 h-6" />
+          ) : (
+            <Mic className="w-6 h-6" />
+          )}
         </button>
 
         <button
@@ -1028,7 +1060,11 @@ export const VideoRoom: React.FC<VideoRoomProps> = ({
           }`}
           title={isVideoEnabled ? '카메라 끄기' : '카메라 켜기'}
         >
-          {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+          {isVideoEnabled ? (
+            <Video className="w-6 h-6" />
+          ) : (
+            <VideoOff className="w-6 h-6" />
+          )}
         </button>
 
         <button

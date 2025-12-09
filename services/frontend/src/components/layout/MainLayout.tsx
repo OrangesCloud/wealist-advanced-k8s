@@ -33,7 +33,7 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({
   onLogout,
   workspaceId,
-  // projectId,
+  projectId,
   children,
   onProfileModalOpen,
   onNotificationClick,
@@ -73,6 +73,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   // Ref
   const userMenuRef = useRef<HTMLDivElement>(null);
   const refreshUnreadCountRef = useRef<() => void>(() => {}); // 🔥 Ref for callback
+  const sidebarWidthClass = 'w-16 sm:w-20'; // Tailwind class for sidebar
   const sidebarWidthPx = '5rem'; // 80px - CSS value for margin (sm: size)
   const chatPanelWidth = '20rem'; // 320px
 
@@ -81,7 +82,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
     try {
       const chats = await getMyChats();
       const filteredChats = chats.filter(
-        (chat) => String(chat.workspaceId) === String(workspaceId),
+        (chat) => String(chat.workspaceId) === String(workspaceId)
       );
       // 🔥 총 읽지 않은 메시지 수 계산
       const total = filteredChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
@@ -345,9 +346,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({
       {isVideoOpen && (
         <VideoCallPanel
           workspaceId={workspaceId}
-          userProfile={
-            userProfile ? { id: userProfile.userId || '', nickName: userProfile.nickName } : null
-          }
+          userProfile={userProfile ? { id: userProfile.userId || '', nickName: userProfile.nickName } : null}
           onClose={() => setIsVideoOpen(false)}
           onJoinRoom={handleJoinVideoRoom}
           currentRoomId={currentVideoRoom?.room.id}
@@ -362,15 +361,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({
           token={currentVideoRoom.token}
           wsUrl={currentVideoRoom.wsUrl}
           onLeave={handleLeaveVideoRoom}
-          userProfile={
-            userProfile
-              ? {
-                  id: userProfile.userId || '',
-                  nickName: userProfile.nickName,
-                  profileImageUrl: userProfile.profileImageUrl,
-                }
-              : null
-          }
+          userProfile={userProfile ? {
+            id: userProfile.userId || '',
+            nickName: userProfile.nickName,
+            profileImageUrl: userProfile.profileImageUrl,
+          } : null}
         />
       )}
 
