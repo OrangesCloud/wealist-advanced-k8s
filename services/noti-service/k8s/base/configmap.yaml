@@ -3,12 +3,11 @@ kind: ConfigMap
 metadata:
   name: noti-service-config
 data:
-  SPRING_PROFILES_ACTIVE: "default"
-  SERVER_PORT: "8084"
-  # Database
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.wealist-infra.svc.cluster.local:5432/wealist_noti_db"
-  # Redis
-  SPRING_DATA_REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
-  SPRING_DATA_REDIS_PORT: "6379"
+  PORT: "8084"
+  ENV: "prod"
+  LOG_LEVEL: "info"
+  # Redis (host/port only - password in secret)
+  REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
+  REDIS_PORT: "6379"
   # Service URLs
-  USER_SERVICE_URL: "http://user-service:8080"
+  AUTH_SERVICE_URL: "http://auth-service:8081"
