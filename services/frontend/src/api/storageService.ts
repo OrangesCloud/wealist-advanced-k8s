@@ -39,8 +39,10 @@ interface SuccessResponse<T> {
  * [API] POST /storage/folders
  */
 export const createFolder = async (data: CreateFolderRequest): Promise<StorageFolder> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder>> =
-    await storageServiceClient.post('/storage/folders', data);
+  const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.post(
+    '/storage/folders',
+    data,
+  );
   return response.data.data;
 };
 
@@ -49,8 +51,9 @@ export const createFolder = async (data: CreateFolderRequest): Promise<StorageFo
  * [API] GET /storage/folders/{folderId}
  */
 export const getFolder = async (folderId: string): Promise<StorageFolder> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder>> =
-    await storageServiceClient.get(`/storage/folders/${folderId}`);
+  const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.get(
+    `/storage/folders/${folderId}`,
+  );
   return response.data.data;
 };
 
@@ -58,10 +61,13 @@ export const getFolder = async (folderId: string): Promise<StorageFolder> => {
  * 폴더 내용 조회 (서브폴더 + 파일)
  * [API] GET /storage/folders/contents?workspaceId=...&folderId=...
  */
-export const getFolderContents = async (workspaceId: string, folderId: string): Promise<FolderContentsResponse> => {
+export const getFolderContents = async (
+  workspaceId: string,
+  folderId: string,
+): Promise<FolderContentsResponse> => {
   const response: AxiosResponse<SuccessResponse<FolderContentsResponse>> =
     await storageServiceClient.get('/storage/folders/contents', {
-      params: { workspaceId, folderId }
+      params: { workspaceId, folderId },
     });
   return response.data.data;
 };
@@ -71,8 +77,9 @@ export const getFolderContents = async (workspaceId: string, folderId: string): 
  * [API] GET /storage/workspaces/{workspaceId}/folders
  */
 export const getRootFolders = async (workspaceId: string): Promise<StorageFolder[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/folders`);
+  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/folders`,
+  );
   return response.data.data || [];
 };
 
@@ -83,7 +90,7 @@ export const getRootFolders = async (workspaceId: string): Promise<StorageFolder
 export const getRootContents = async (workspaceId: string): Promise<FolderContentsResponse> => {
   const response: AxiosResponse<SuccessResponse<FolderContentsResponse>> =
     await storageServiceClient.get('/storage/folders/contents', {
-      params: { workspaceId }
+      params: { workspaceId },
     });
   return response.data.data;
 };
@@ -93,8 +100,9 @@ export const getRootContents = async (workspaceId: string): Promise<FolderConten
  * [API] GET /storage/workspaces/{workspaceId}/folders
  */
 export const getFolderTree = async (workspaceId: string): Promise<StorageFolder[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/folders`);
+  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/folders`,
+  );
   return response.data.data || [];
 };
 
@@ -102,9 +110,14 @@ export const getFolderTree = async (workspaceId: string): Promise<StorageFolder[
  * 폴더 수정
  * [API] PUT /storage/folders/{folderId}
  */
-export const updateFolder = async (folderId: string, data: UpdateFolderRequest): Promise<StorageFolder> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder>> =
-    await storageServiceClient.put(`/storage/folders/${folderId}`, data);
+export const updateFolder = async (
+  folderId: string,
+  data: UpdateFolderRequest,
+): Promise<StorageFolder> => {
+  const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.put(
+    `/storage/folders/${folderId}`,
+    data,
+  );
   return response.data.data;
 };
 
@@ -129,8 +142,9 @@ export const deleteFolderPermanent = async (folderId: string): Promise<void> => 
  * [API] POST /storage/folders/{folderId}/restore
  */
 export const restoreFolder = async (folderId: string): Promise<StorageFolder> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder>> =
-    await storageServiceClient.post(`/storage/folders/${folderId}/restore`);
+  const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.post(
+    `/storage/folders/${folderId}/restore`,
+  );
   return response.data.data;
 };
 
@@ -142,7 +156,9 @@ export const restoreFolder = async (folderId: string): Promise<StorageFolder> =>
  * 업로드 URL 생성
  * [API] POST /storage/files/upload-url
  */
-export const generateUploadURL = async (data: GenerateUploadURLRequest): Promise<GenerateUploadURLResponse> => {
+export const generateUploadURL = async (
+  data: GenerateUploadURLRequest,
+): Promise<GenerateUploadURLResponse> => {
   const response: AxiosResponse<SuccessResponse<GenerateUploadURLResponse>> =
     await storageServiceClient.post('/storage/files/upload-url', data);
   return response.data.data;
@@ -164,8 +180,10 @@ export const uploadFileToS3 = async (uploadUrl: string, file: File): Promise<voi
  * [API] POST /storage/files/confirm
  */
 export const confirmUpload = async (data: ConfirmUploadRequest): Promise<StorageFile> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile>> =
-    await storageServiceClient.post('/storage/files/confirm', data);
+  const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.post(
+    '/storage/files/confirm',
+    data,
+  );
   return response.data.data;
 };
 
@@ -177,7 +195,7 @@ export const uploadFile = async (
   file: File,
   workspaceId: string,
   folderId?: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
 ): Promise<StorageFile> => {
   // 1. Upload URL 생성
   const uploadUrlResponse = await generateUploadURL({
@@ -214,8 +232,9 @@ export const uploadFile = async (
  * [API] GET /storage/files/{fileId}
  */
 export const getFile = async (fileId: string): Promise<StorageFile> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile>> =
-    await storageServiceClient.get(`/storage/files/${fileId}`);
+  const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.get(
+    `/storage/files/${fileId}`,
+  );
   return response.data.data;
 };
 
@@ -226,12 +245,14 @@ export const getFile = async (fileId: string): Promise<StorageFile> => {
 export const getFilesByFolder = async (
   folderId: string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
 ): Promise<FileListResponse> => {
-  const response: AxiosResponse<SuccessResponse<FileListResponse>> =
-    await storageServiceClient.get(`/storage/files/folder/${folderId}`, {
+  const response: AxiosResponse<SuccessResponse<FileListResponse>> = await storageServiceClient.get(
+    `/storage/files/folder/${folderId}`,
+    {
       params: { page, pageSize },
-    });
+    },
+  );
   return response.data.data;
 };
 
@@ -242,12 +263,14 @@ export const getFilesByFolder = async (
 export const getRootFiles = async (
   workspaceId: string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 50,
 ): Promise<FileListResponse> => {
-  const response: AxiosResponse<SuccessResponse<FileListResponse>> =
-    await storageServiceClient.get(`/storage/files/workspace/${workspaceId}/root`, {
+  const response: AxiosResponse<SuccessResponse<FileListResponse>> = await storageServiceClient.get(
+    `/storage/files/workspace/${workspaceId}/root`,
+    {
       params: { page, pageSize },
-    });
+    },
+  );
   return response.data.data;
 };
 
@@ -256,8 +279,10 @@ export const getRootFiles = async (
  * [API] PUT /storage/files/{fileId}
  */
 export const updateFile = async (fileId: string, data: UpdateFileRequest): Promise<StorageFile> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile>> =
-    await storageServiceClient.put(`/storage/files/${fileId}`, data);
+  const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.put(
+    `/storage/files/${fileId}`,
+    data,
+  );
   return response.data.data;
 };
 
@@ -282,8 +307,9 @@ export const deleteFilePermanent = async (fileId: string): Promise<void> => {
  * [API] POST /storage/files/{fileId}/restore
  */
 export const restoreFile = async (fileId: string): Promise<StorageFile> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile>> =
-    await storageServiceClient.post(`/storage/files/${fileId}/restore`);
+  const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.post(
+    `/storage/files/${fileId}/restore`,
+  );
   return response.data.data;
 };
 
@@ -319,8 +345,10 @@ export const downloadFile = async (fileId: string, fileName: string): Promise<vo
  * [API] POST /storage/shares
  */
 export const createShare = async (data: CreateShareRequest): Promise<StorageShare> => {
-  const response: AxiosResponse<SuccessResponse<StorageShare>> =
-    await storageServiceClient.post('/storage/shares', data);
+  const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.post(
+    '/storage/shares',
+    data,
+  );
   return response.data.data;
 };
 
@@ -329,8 +357,9 @@ export const createShare = async (data: CreateShareRequest): Promise<StorageShar
  * [API] GET /storage/shares/{shareId}
  */
 export const getShare = async (shareId: string): Promise<StorageShare> => {
-  const response: AxiosResponse<SuccessResponse<StorageShare>> =
-    await storageServiceClient.get(`/storage/shares/${shareId}`);
+  const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.get(
+    `/storage/shares/${shareId}`,
+  );
   return response.data.data;
 };
 
@@ -340,10 +369,11 @@ export const getShare = async (shareId: string): Promise<StorageShare> => {
  */
 export const getSharesByEntity = async (
   entityType: 'FILE' | 'FOLDER',
-  entityId: string
+  entityId: string,
 ): Promise<StorageShare[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageShare[]>> =
-    await storageServiceClient.get(`/storage/shares/entity/${entityType}/${entityId}`);
+  const response: AxiosResponse<SuccessResponse<StorageShare[]>> = await storageServiceClient.get(
+    `/storage/shares/entity/${entityType}/${entityId}`,
+  );
   return response.data.data || [];
 };
 
@@ -352,8 +382,9 @@ export const getSharesByEntity = async (
  * [API] GET /storage/shared-with-me
  */
 export const getSharedWithMe = async (): Promise<SharedItem[]> => {
-  const response: AxiosResponse<SuccessResponse<SharedItem[]>> =
-    await storageServiceClient.get('/storage/shared-with-me');
+  const response: AxiosResponse<SuccessResponse<SharedItem[]>> = await storageServiceClient.get(
+    '/storage/shared-with-me',
+  );
   return response.data.data || [];
 };
 
@@ -361,9 +392,14 @@ export const getSharedWithMe = async (): Promise<SharedItem[]> => {
  * 공유 수정
  * [API] PUT /storage/shares/{shareId}
  */
-export const updateShare = async (shareId: string, data: UpdateShareRequest): Promise<StorageShare> => {
-  const response: AxiosResponse<SuccessResponse<StorageShare>> =
-    await storageServiceClient.put(`/storage/shares/${shareId}`, data);
+export const updateShare = async (
+  shareId: string,
+  data: UpdateShareRequest,
+): Promise<StorageShare> => {
+  const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.put(
+    `/storage/shares/${shareId}`,
+    data,
+  );
   return response.data.data;
 };
 
@@ -379,16 +415,20 @@ export const deleteShare = async (shareId: string): Promise<void> => {
  * 공유 링크로 접근
  * [API] GET /public/storage/share/{shareLink}
  */
-export const accessShareLink = async (shareLink: string): Promise<{
+export const accessShareLink = async (
+  shareLink: string,
+): Promise<{
   share: StorageShare;
   file?: StorageFile;
   folder?: StorageFolder;
 }> => {
-  const response: AxiosResponse<SuccessResponse<{
-    share: StorageShare;
-    file?: StorageFile;
-    folder?: StorageFolder;
-  }>> = await storageServiceClient.get(`/public/storage/share/${shareLink}`);
+  const response: AxiosResponse<
+    SuccessResponse<{
+      share: StorageShare;
+      file?: StorageFile;
+      folder?: StorageFolder;
+    }>
+  > = await storageServiceClient.get(`/public/storage/share/${shareLink}`);
   return response.data.data;
 };
 
@@ -401,8 +441,9 @@ export const accessShareLink = async (shareLink: string): Promise<{
  * [API] GET /storage/workspaces/{workspaceId}/usage
  */
 export const getStorageUsage = async (workspaceId: string): Promise<StorageUsage> => {
-  const response: AxiosResponse<SuccessResponse<StorageUsage>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/usage`);
+  const response: AxiosResponse<SuccessResponse<StorageUsage>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/usage`,
+  );
   return response.data.data;
 };
 
@@ -415,8 +456,9 @@ export const getStorageUsage = async (workspaceId: string): Promise<StorageUsage
  * [API] GET /storage/workspaces/{workspaceId}/trash/folders
  */
 export const getTrashFolders = async (workspaceId: string): Promise<StorageFolder[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/trash/folders`);
+  const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/trash/folders`,
+  );
   return response.data.data || [];
 };
 
@@ -425,8 +467,9 @@ export const getTrashFolders = async (workspaceId: string): Promise<StorageFolde
  * [API] GET /storage/workspaces/{workspaceId}/trash/files
  */
 export const getTrashFiles = async (workspaceId: string): Promise<StorageFile[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile[]>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/trash/files`);
+  const response: AxiosResponse<SuccessResponse<StorageFile[]>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/trash/files`,
+  );
   return response.data.data || [];
 };
 
@@ -449,12 +492,13 @@ export const emptyTrash = async (workspaceId: string): Promise<void> => {
 export const searchStorage = async (
   workspaceId: string,
   query: string,
-  type?: 'file' | 'folder' | 'all'
+  type?: 'file' | 'folder' | 'all',
 ): Promise<{ files: StorageFile[]; folders: StorageFolder[] }> => {
-  const response: AxiosResponse<SuccessResponse<{ files: StorageFile[]; folders: StorageFolder[] }>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/files/search`, {
-      params: { query, type: type || 'all' },
-    });
+  const response: AxiosResponse<
+    SuccessResponse<{ files: StorageFile[]; folders: StorageFolder[] }>
+  > = await storageServiceClient.get(`/storage/workspaces/${workspaceId}/files/search`, {
+    params: { query, type: type || 'all' },
+  });
   return response.data.data;
 };
 
@@ -469,10 +513,11 @@ export const searchStorage = async (
  */
 export const getRecentFiles = async (
   workspaceId: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<StorageFile[]> => {
-  const response: AxiosResponse<SuccessResponse<StorageFile[]>> =
-    await storageServiceClient.get(`/storage/workspaces/${workspaceId}/files`);
+  const response: AxiosResponse<SuccessResponse<StorageFile[]>> = await storageServiceClient.get(
+    `/storage/workspaces/${workspaceId}/files`,
+  );
   const files = response.data.data || [];
   // 최근 수정된 순으로 정렬 후 limit만큼 반환
   return files
@@ -491,7 +536,7 @@ export const getRecentFiles = async (
  */
 export const addToStarred = async (
   entityType: 'FILE' | 'FOLDER',
-  entityId: string
+  entityId: string,
 ): Promise<void> => {
   console.warn('Starred feature not yet implemented in backend');
   // TODO: await storageServiceClient.post('/storage/starred', { entityType, entityId });
@@ -501,10 +546,9 @@ export const addToStarred = async (
  * 즐겨찾기 제거
  * @todo Backend에 즐겨찾기 API 구현 필요
  */
-export const removeFromStarred = async (
-  entityType: 'FILE' | 'FOLDER',
-  entityId: string
-): Promise<void> => {
+export const removeFromStarred = async (): // entityType: 'FILE' | 'FOLDER',
+// entityId: string
+Promise<void> => {
   console.warn('Starred feature not yet implemented in backend');
   // TODO: await storageServiceClient.delete(`/storage/starred/${entityType}/${entityId}`);
 };
@@ -513,9 +557,8 @@ export const removeFromStarred = async (
  * 즐겨찾기 목록 조회
  * @todo Backend에 즐겨찾기 API 구현 필요
  */
-export const getStarredItems = async (
-  workspaceId: string
-): Promise<{ files: StorageFile[]; folders: StorageFolder[] }> => {
+export const getStarredItems = async (): // workspaceId: string
+Promise<{ files: StorageFile[]; folders: StorageFolder[] }> => {
   console.warn('Starred feature not yet implemented in backend');
   // 빈 배열 반환 (Backend 미구현)
   return { files: [], folders: [] };

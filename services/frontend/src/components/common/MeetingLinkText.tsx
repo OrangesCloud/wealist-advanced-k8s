@@ -1,7 +1,7 @@
 // src/components/common/MeetingLinkText.tsx
 // 회의 기록 링크를 감지하여 클릭 가능하게 만드는 컴포넌트
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Video } from 'lucide-react';
 
 interface MeetingLinkTextProps {
