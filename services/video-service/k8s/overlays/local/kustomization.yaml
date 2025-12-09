@@ -7,7 +7,7 @@ resources:
   - ../../base
 
 images:
-  - name: video-service
+  - name: wealist/video-service
     newName: video-service
     newTag: local
 
