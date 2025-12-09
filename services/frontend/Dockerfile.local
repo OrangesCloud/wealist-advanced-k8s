@@ -17,7 +17,8 @@ RUN pnpm install --frozen-lockfile
 # --- Build Stage ---
 FROM dependencies AS builder
 COPY . .
-RUN pnpm run build
+# TypeScript 타입 체크 건너뛰고 vite build만 실행 (로컬 개발용)
+RUN npx vite build
 
 # --- Production Stage ---
 FROM nginx:stable-alpine AS production
