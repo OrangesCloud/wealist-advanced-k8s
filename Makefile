@@ -9,6 +9,7 @@ help:
 	@echo "    make dev-down        - Stop all services"
 	@echo "    make dev-logs        - View logs from all services"
 	@echo "    make dev-restart     - Restart all services"
+	@echo "    make dev-build       - Build all services"
 	@echo ""
 	@echo "  Build:"
 	@echo "    make build-all       - Build all service images"
@@ -26,6 +27,8 @@ help:
 	@echo "  Utility:"
 	@echo "    make clean           - Clean build artifacts and volumes"
 	@echo "    make test-health     - Test health endpoints"
+	@echo "    make status          - Show status of containers and pods"
+	@echo "    make monitoring      - Start monitoring stack"
 
 # =============================================================================
 # Development (Docker Compose)
@@ -50,7 +53,7 @@ dev-build:
 # Build Docker Images
 # =============================================================================
 
-SERVICES := user-service auth-service board-service chat-service noti-service frontend
+SERVICES := user-service auth-service board-service chat-service noti-service storage-service video-service frontend
 
 build-all: $(addprefix build-,$(SERVICES))
 
@@ -69,6 +72,12 @@ build-chat-service:
 build-noti-service:
 	docker build -t noti-service:local -f services/noti-service/docker/Dockerfile services/noti-service
 
+build-storage-service:
+	docker build -t storage-service:local -f services/storage-service/docker/Dockerfile services/storage-service
+
+build-video-service:
+	docker build -t video-service:local -f services/video-service/docker/Dockerfile services/video-service
+
 build-frontend:
 	docker build -t frontend:local -f services/frontend/Dockerfile services/frontend
 
@@ -83,10 +92,14 @@ k8s-apply-local:
 	kubectl apply -k services/board-service/k8s/overlays/local
 	kubectl apply -k services/chat-service/k8s/overlays/local
 	kubectl apply -k services/noti-service/k8s/overlays/local
+	kubectl apply -k services/storage-service/k8s/overlays/local
+	kubectl apply -k services/video-service/k8s/overlays/local
 	kubectl apply -k services/frontend/k8s/overlays/local
 
 k8s-delete-local:
 	kubectl delete -k services/frontend/k8s/overlays/local --ignore-not-found
+	kubectl delete -k services/video-service/k8s/overlays/local --ignore-not-found
+	kubectl delete -k services/storage-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/noti-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/chat-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/board-service/k8s/overlays/local --ignore-not-found
@@ -113,6 +126,12 @@ kustomize-chat-service:
 kustomize-noti-service:
 	kubectl kustomize services/noti-service/k8s/overlays/local
 
+kustomize-storage-service:
+	kubectl kustomize services/storage-service/k8s/overlays/local
+
+kustomize-video-service:
+	kubectl kustomize services/video-service/k8s/overlays/local
+
 kustomize-frontend:
 	kubectl kustomize services/frontend/k8s/overlays/local
 
@@ -127,28 +146,20 @@ k8s-apply-eks:
 	kubectl apply -k services/board-service/k8s/overlays/eks
 	kubectl apply -k services/chat-service/k8s/overlays/eks
 	kubectl apply -k services/noti-service/k8s/overlays/eks
+	kubectl apply -k services/storage-service/k8s/overlays/eks
+	kubectl apply -k services/video-service/k8s/overlays/eks
 	kubectl apply -k services/frontend/k8s/overlays/eks
 
 k8s-delete-eks:
 	kubectl delete -k services/frontend/k8s/overlays/eks --ignore-not-found
+	kubectl delete -k services/video-service/k8s/overlays/eks --ignore-not-found
+	kubectl delete -k services/storage-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k services/noti-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k services/chat-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k services/board-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k services/auth-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k services/user-service/k8s/overlays/eks --ignore-not-found
 	kubectl delete -k infrastructure/overlays/eks --ignore-not-found
-
-# =============================================================================
-# ArgoCD
-# =============================================================================
-
-argocd-apply:
-	kubectl apply -f argocd/apps/project.yaml
-	kubectl apply -f argocd/apps/root-app.yaml
-
-argocd-delete:
-	kubectl delete -f argocd/apps/root-app.yaml --ignore-not-found
-	kubectl delete -f argocd/apps/project.yaml --ignore-not-found
 
 # =============================================================================
 # Utility
@@ -159,6 +170,9 @@ clean:
 
 test-health:
 	./docker/scripts/test-health.sh
+
+monitoring:
+	./docker/scripts/monitoring.sh
 
 # Status check
 status:
