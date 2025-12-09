@@ -62,11 +62,11 @@ Grafana provisioning을 통해 자동 설정되어 있습니다. 수동 설정 �
 | 서비스 | Metrics Endpoint | Health Endpoint |
 |--------|------------------|-----------------|
 | board-service | `/metrics`, `/api/boards/metrics` | `/health`, `/ready` |
+| user-service | `/metrics` | `/health`, `/ready` |
+| chat-service | `/metrics` | `/health`, `/ready` |
 | noti-service | `/metrics` | `/health`, `/ready` |
-| chat-service | - | `/health`, `/ready` |
-| user-service | - | `/health`, `/ready` |
-| storage-service | - | `/health`, `/ready` |
-| video-service | - | `/health`, `/ready` |
+| storage-service | `/metrics` | `/health`, `/ready` |
+| video-service | `/metrics` | `/health`, `/ready` |
 
 ### Spring Boot 서비스 (Micrometer)
 
@@ -330,3 +330,235 @@ curl http://localhost:3100/loki/api/v1/labels
 ```bash
 docker compose -f docker/compose/docker-compose.yml restart prometheus loki promtail grafana redis-exporter postgres-exporter
 ```
+
+## Grafana 대시보드 구성
+
+Grafana provisioning을 통해 자동으로 대시보드가 등록됩니다. 대시보드 JSON 파일은 `docker/monitoring/grafana/provisioning/dashboards/json/` 경로에 위치합니다.
+
+### 대시보드 구조
+
+```
+docker/monitoring/grafana/provisioning/
+├── datasources/
+│   └── datasources.yml          # Prometheus, Loki 자동 등록
+├── dashboards/
+│   ├── dashboards.yml           # 대시보드 프로비저닝 설정
+│   └── json/
+│       ├── services-overview.json
+│       ├── database-dashboard.json
+│       ├── infra-dashboard.json
+│       ├── developer-dashboard.json
+│       ├── business-dashboard.json
+│       ├── service-detail.json
+│       └── log-analysis-dashboard.json
+└── alerting/                    # 알림 규칙 (추후)
+```
+
+### 역할별 대시보드
+
+| 대상 | 대시보드 | 설명 |
+|------|---------|------|
+| 기획자/PM | 기획자 대시보드 | DAU/MAU, 비즈니스 메트릭 |
+| 인프라 담당자 | 인프라 대시보드 | 서비스 상태, SLI, 트래픽 |
+| 인프라 담당자 | 데이터베이스 모니터링 | PostgreSQL, Redis 상세 |
+| 개발자 | 개발자 대시보드 | API 성능, 에러 분석 |
+| 개발자 | 로그 분석 & 디버깅 | 로그 검색, 에러 탐지 |
+| 공통 | 서비스 개요 | 전체 서비스 상태 한눈에 |
+| 공통 | 서비스 상세 | 개별 서비스 심층 분석 |
+
+---
+
+### 1. weAlist Services Overview (services-overview.json)
+
+**UID**: `wealist-overview`
+**Tags**: `wealist`, `overview`
+
+전체 서비스의 상태를 한눈에 파악할 수 있는 개요 대시보드입니다.
+
+**주요 패널:**
+- **Service Status**: 모든 서비스의 UP/DOWN 상태
+- **Request Rate**: 서비스별 초당 요청 수 (RPS)
+- **Response Time (p95)**: 서비스별 95퍼센타일 응답시간
+- **All Service Logs**: Loki를 통한 전체 서비스 로그 스트림
+
+---
+
+### 2. 데이터베이스 모니터링 (database-dashboard.json)
+
+**UID**: `database-dashboard`
+**Tags**: `wealist`, `database`, `postgres`, `redis`
+
+PostgreSQL과 Redis의 상세 메트릭을 모니터링하는 대시보드입니다.
+
+**PostgreSQL 섹션:**
+| 패널 | 메트릭 | 설명 |
+|------|--------|------|
+| PostgreSQL 상태 | `pg_up` | UP/DOWN 상태 |
+| 활성 연결 수 | `pg_stat_activity_count` | 현재 연결 수 |
+| 전체 DB 크기 | `pg_database_size_bytes` | 데이터베이스 용량 |
+| 트랜잭션/초 | `pg_stat_database_xact_commit` | Commit 처리량 |
+| 롤백/초 | `pg_stat_database_xact_rollback` | 롤백 발생량 |
+| Cache Hit Ratio | `blks_hit / (blks_hit + blks_read)` | 캐시 효율 |
+| Row 작업량 | `tup_inserted/updated/deleted` | INSERT/UPDATE/DELETE 추이 |
+
+**Redis 섹션:**
+| 패널 | 메트릭 | 설명 |
+|------|--------|------|
+| Redis 상태 | `redis_up` | UP/DOWN 상태 |
+| 연결된 클라이언트 | `redis_connected_clients` | 현재 연결 수 |
+| 메모리 사용량 | `redis_memory_used_bytes` | 메모리 사용량 |
+| 총 Key 수 | `redis_db_keys` | 저장된 키 개수 |
+| 명령어/초 | `redis_commands_processed_total` | 처리량 |
+| Hit Rate | `hits / (hits + misses)` | 캐시 히트율 |
+
+---
+
+### 3. 인프라 대시보드 (infra-dashboard.json)
+
+**UID**: `infra-dashboard`
+**Tags**: `wealist`, `infra`, `인프라`
+
+인프라 담당자를 위한 운영 대시보드입니다. SLI(Service Level Indicators) 중심으로 구성되어 있습니다.
+
+**주요 섹션:**
+- **전체 서비스 상태**: 모든 서비스 UP/DOWN 현황 (색상으로 구분)
+- **핵심 지표 (SLI)**:
+  - 전체 RPS
+  - 전체 에러율 (5% 초과 시 빨간색)
+  - 전체 응답시간 p95 (1초 초과 시 빨간색)
+  - 처리 중 요청 수
+- **서비스별 에러율**: 5xx 에러 추이 (5% 임계선 표시)
+- **서비스별 응답시간**: p95 응답시간 추이
+- **트래픽**: 서비스별 RPS, HTTP 상태코드 분포 (2xx/4xx/5xx)
+- **인프라 (Redis)**: 연결 수, 메모리, 명령어/초
+- **에러 로그**: Loki 기반 실시간 에러 로그
+
+---
+
+### 4. 개발자 대시보드 (developer-dashboard.json)
+
+**UID**: `developer-dashboard`
+**Tags**: `wealist`, `developer`, `개발자`
+
+개발자를 위한 API 성능 분석 및 디버깅 대시보드입니다.
+
+**Variables:**
+- `$service`: 서비스 선택 (다중 선택 가능)
+- `$search`: 로그 검색어 입력
+
+**주요 섹션:**
+- **API 성능 개요**: 서비스별 RPS, p95 응답시간, 에러율을 테이블로 표시
+- **느린 엔드포인트 분석**: Top 20 느린 API (p95, p99, 요청수)
+- **에러 분석**:
+  - 5xx 에러 발생 추이 (서비스/경로별)
+  - 4xx 에러 발생 추이 (서비스/상태코드별)
+- **로그 탐색기**:
+  - 에러 로그 (error|fail|exception|panic)
+  - 키워드 검색
+- **응답시간 분포**: p50, p90, p95, p99 백분위수 추이
+
+---
+
+### 5. 기획자 대시보드 - DAU/MAU & 비즈니스 (business-dashboard.json)
+
+**UID**: `business-dashboard`
+**Tags**: `wealist`, `business`, `기획자`, `DAU`, `MAU`
+
+기획자/PM을 위한 비즈니스 메트릭 대시보드입니다. 기술적 지표보다 사용자 활동과 비즈니스 성과에 초점을 맞췄습니다.
+
+**DAU/MAU 및 사용자 현황:**
+| 패널 | 설명 |
+|------|------|
+| 현재 동시 접속자 | 실시간 활성 세션 수 |
+| DAU (추정) | 일일 로그인 기준 추정치 |
+| MAU (추정) | 월간 로그인 기준 추정치 |
+| 전체 회원 수 | 총 가입자 수 |
+| 오늘 신규 가입 | 당일 회원가입 수 |
+| 전체 워크스페이스 | 워크스페이스 수 |
+
+**Board 서비스 (프로젝트 & 보드):**
+- 전체 프로젝트 수
+- 전체 보드 수
+- 오늘 생성된 프로젝트/보드
+- 생성 추이 그래프
+
+**Chat & Video 서비스:**
+- 채팅 사용자, 활성 채팅방, 메시지 수
+- 비디오 사용자, 진행 중 회의
+- 활동 추이 그래프
+
+**워크스페이스 현황:**
+- 워크스페이스 생성 추이
+- 전체 워크스페이스 수 추이
+
+---
+
+### 6. 서비스 상세 (service-detail.json)
+
+**UID**: `service-detail`
+**Tags**: `wealist`, `service`
+
+개별 서비스를 심층 분석하기 위한 대시보드입니다. 드롭다운에서 서비스를 선택하여 사용합니다.
+
+**Variables:**
+- `$service`: 분석할 서비스 선택
+
+**주요 섹션:**
+- **서비스 상태**: 상태, RPS, 에러율, p95 응답시간, 처리 중 요청
+- **트래픽 추이**: HTTP 상태코드별 요청, 응답 시간 분포 (p50/p95/p99)
+- **엔드포인트별 성능**:
+  - 요청량 Top 10
+  - 느린 엔드포인트 p95 Top 10
+- **로그**: 해당 서비스의 최근 로그 스트림
+
+---
+
+### 7. 로그 분석 & 디버깅 (log-analysis-dashboard.json)
+
+**UID**: `log-analysis-dashboard`
+**Tags**: `wealist`, `logs`, `debugging`, `로그`
+
+Loki 기반 로그 분석 및 디버깅 전용 대시보드입니다.
+
+**Variables:**
+- `$service`: 서비스 선택 (다중 선택 가능)
+- `$search`: 검색어 입력 (요청 ID, 사용자 ID 등)
+
+**에러 현황:**
+| 패널 | 설명 |
+|------|------|
+| 총 에러 수 | 선택 기간 내 에러 로그 수 |
+| 심각한 에러 | Panic/Fatal 로그 수 |
+| 경고 수 | Warning 로그 수 |
+| 연결 문제 | Timeout/Connection refused 등 |
+
+**서비스별 에러 분석:**
+- 서비스별 에러 추이 (Stacked bar)
+- 서비스별 HTTP 에러 (4xx/5xx)
+
+**문제 API 탐지:**
+- 5xx 에러 로그 (문제 API 찾기)
+- 느린 요청/타임아웃 로그
+
+**디버깅:**
+- 키워드 검색 (요청 ID, 사용자 ID 등)
+- 구조화된 에러/경고 로그 (JSON 파싱)
+- 전체 로그 실시간 스트림
+
+---
+
+### 대시보드 사용 팁
+
+1. **기획자**: 매일 기획자 대시보드에서 DAU/MAU 확인, 신규 가입 추이 모니터링
+2. **인프라**: 인프라 대시보드를 메인 모니터에 띄워두고 에러율/응답시간 감시
+3. **개발자**: 배포 후 개발자 대시보드에서 에러 추이 확인, 느린 API 최적화
+4. **장애 대응**: 로그 분석 대시보드에서 에러 키워드 검색, 요청 ID 추적
+
+### 대시보드 커스터마이징
+
+대시보드 수정 후 영구 저장하려면:
+
+1. Grafana UI에서 대시보드 수정
+2. Dashboard settings > JSON Model 복사
+3. `docker/monitoring/grafana/provisioning/dashboards/json/` 해당 파일 업데이트
+4. 모니터링 스택 재시작 또는 30초 대기 (자동 업데이트)

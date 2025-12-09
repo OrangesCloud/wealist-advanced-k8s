@@ -107,13 +107,13 @@ K8s 환경에서는 ClusterIP 서비스로 내부 통신합니다:
 
 | 서비스 | Health | Ready | Metrics |
 |--------|--------|-------|---------|
-| user-service | `/health` | `/ready` | - |
+| user-service | `/health` | `/ready` | `/metrics` |
 | auth-service | `/actuator/health/liveness` | `/actuator/health/readiness` | `/actuator/prometheus` |
 | board-service | `/health` | `/ready` | `/metrics` |
-| chat-service | `/health` | `/ready` | - |
+| chat-service | `/health` | `/ready` | `/metrics` |
 | noti-service | `/health` | `/ready` | `/metrics` |
-| storage-service | `/health` | `/ready` | - |
-| video-service | `/health` | `/ready` | - |
+| storage-service | `/health` | `/ready` | `/metrics` |
+| video-service | `/health` | `/ready` | `/metrics` |
 
 ## 포트 충돌 확인
 

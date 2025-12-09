@@ -22,11 +22,18 @@ NC='\033[0m' # No Color
 BOLD='\033[1m'
 
 # 서비스 포트 정의 (.env.dev 기본값과 일치)
-AUTH_SERVICE_PORT=${AUTH_HOST_PORT:-8080}
-USER_SERVICE_PORT=${USER_HOST_PORT:-8090}
+AUTH_SERVICE_PORT=${AUTH_HOST_PORT:-8090}
+USER_SERVICE_PORT=${USER_HOST_PORT:-8080}
 BOARD_SERVICE_PORT=${BOARD_HOST_PORT:-8000}
 CHAT_SERVICE_PORT=${CHAT_HOST_PORT:-8001}
 NOTI_SERVICE_PORT=${NOTI_HOST_PORT:-8002}
+STORAGE_SERVICE_PORT=${STORAGE_HOST_PORT:-8003}
+VIDEO_SERVICE_PORT=${VIDEO_HOST_PORT:-8004}
+
+# 모니터링 포트
+PROMETHEUS_PORT=${PROMETHEUS_PORT:-9090}
+GRAFANA_PORT=${GRAFANA_PORT:-3001}
+LOKI_PORT=${LOKI_PORT:-3100}
 
 # 헬퍼 함수
 print_header() {
@@ -114,13 +121,26 @@ check_services_running() {
 
     local all_running=true
 
+    echo -e "${BOLD}  [Backend Services]${NC}"
     check_container_status "wealist-auth-service" || { all_running=false; true; }
     check_container_status "wealist-user-service" || { all_running=false; true; }
     check_container_status "wealist-board-service" || { all_running=false; true; }
     check_container_status "wealist-chat-service" || { all_running=false; true; }
     check_container_status "wealist-noti-service" || { all_running=false; true; }
+    check_container_status "wealist-storage-service" || { all_running=false; true; }
+    check_container_status "wealist-video-service" || { all_running=false; true; }
+    echo ""
+    echo -e "${BOLD}  [Infrastructure]${NC}"
     check_container_status "wealist-postgres" || { all_running=false; true; }
     check_container_status "wealist-redis" || { all_running=false; true; }
+    check_container_status "wealist-minio" || { all_running=false; true; }
+    check_container_status "wealist-livekit" || { all_running=false; true; }
+    check_container_status "wealist-coturn" || { all_running=false; true; }
+    echo ""
+    echo -e "${BOLD}  [Monitoring] (선택적)${NC}"
+    check_container_status "wealist-prometheus" || true
+    check_container_status "wealist-grafana" || true
+    check_container_status "wealist-loki" || true
 
     echo ""
 
@@ -141,19 +161,29 @@ run_all_health_checks() {
     echo ""
 
     echo -e "${BOLD}  [Liveness Probes] - 서비스 생존 여부 (외부 의존성 무관)${NC}"
-    check_liveness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/liveness" "Redis 무관" || true
-    check_liveness "user-service " "http://localhost:${USER_SERVICE_PORT}/health" "PostgreSQL 무관" || true
-    check_liveness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/health" "PostgreSQL 무관" || true
-    check_liveness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/health" "PostgreSQL 무관" || true
-    check_liveness "noti-service " "http://localhost:${NOTI_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "auth-service   " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/liveness" "Redis 무관" || true
+    check_liveness "user-service   " "http://localhost:${USER_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "board-service  " "http://localhost:${BOARD_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "chat-service   " "http://localhost:${CHAT_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "noti-service   " "http://localhost:${NOTI_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "storage-service" "http://localhost:${STORAGE_SERVICE_PORT}/health" "PostgreSQL 무관" || true
+    check_liveness "video-service  " "http://localhost:${VIDEO_SERVICE_PORT}/health" "PostgreSQL 무관" || true
 
     echo ""
     echo -e "${BOLD}  [Readiness Probes] - 트래픽 수신 준비 (외부 의존성 포함)${NC}"
-    check_readiness "auth-service " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/readiness" "Redis 체크" || true
-    check_readiness "user-service " "http://localhost:${USER_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
-    check_readiness "board-service" "http://localhost:${BOARD_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
-    check_readiness "chat-service " "http://localhost:${CHAT_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
-    check_readiness "noti-service " "http://localhost:${NOTI_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "auth-service   " "http://localhost:${AUTH_SERVICE_PORT}/actuator/health/readiness" "Redis 체크" || true
+    check_readiness "user-service   " "http://localhost:${USER_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "board-service  " "http://localhost:${BOARD_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "chat-service   " "http://localhost:${CHAT_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "noti-service   " "http://localhost:${NOTI_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "storage-service" "http://localhost:${STORAGE_SERVICE_PORT}/ready" "PostgreSQL 체크" || true
+    check_readiness "video-service  " "http://localhost:${VIDEO_SERVICE_PORT}/ready" "PostgreSQL+Redis 체크" || true
+
+    echo ""
+    echo -e "${BOLD}  [Monitoring Services]${NC}"
+    check_liveness "prometheus     " "http://localhost:${PROMETHEUS_PORT}/-/healthy" "메트릭 수집" || true
+    check_liveness "grafana        " "http://localhost:${GRAFANA_PORT}/api/health" "대시보드" || true
+    check_liveness "loki           " "http://localhost:${LOKI_PORT}/ready" "로그 수집" || true
 
     echo ""
 }
@@ -163,7 +193,7 @@ check_restart_count() {
     print_step "컨테이너 재시작 횟수 확인..."
     echo ""
 
-    for container in wealist-auth-service wealist-user-service wealist-board-service wealist-chat-service wealist-noti-service; do
+    for container in wealist-auth-service wealist-user-service wealist-board-service wealist-chat-service wealist-noti-service wealist-storage-service wealist-video-service; do
         local count=$(docker inspect --format='{{.RestartCount}}' "$container" 2>/dev/null || echo "N/A")
         echo -e "  $container: ${BOLD}$count${NC} 회 재시작"
     done
@@ -185,11 +215,13 @@ main() {
     echo "  4. DB 복구 후 readiness가 다시 성공하는지"
     echo ""
     echo -e "${BOLD}서비스별 Readiness 의존성:${NC}"
-    echo -e "  ${CYAN}auth-service${NC}  → Redis (PostgreSQL 사용 안 함)"
-    echo -e "  ${CYAN}user-service${NC}  → PostgreSQL"
-    echo -e "  ${CYAN}board-service${NC} → PostgreSQL"
-    echo -e "  ${CYAN}chat-service${NC}  → PostgreSQL"
-    echo -e "  ${CYAN}noti-service${NC}  → PostgreSQL"
+    echo -e "  ${CYAN}auth-service${NC}    → Redis (PostgreSQL 사용 안 함)"
+    echo -e "  ${CYAN}user-service${NC}    → PostgreSQL"
+    echo -e "  ${CYAN}board-service${NC}   → PostgreSQL"
+    echo -e "  ${CYAN}chat-service${NC}    → PostgreSQL"
+    echo -e "  ${CYAN}noti-service${NC}    → PostgreSQL"
+    echo -e "  ${CYAN}storage-service${NC} → PostgreSQL"
+    echo -e "  ${CYAN}video-service${NC}   → PostgreSQL, Redis, LiveKit"
     echo ""
 
     # Step 1: 서비스 실행 확인
@@ -245,6 +277,8 @@ main() {
     check_container_status "wealist-board-service" || all_alive=false
     check_container_status "wealist-chat-service" || all_alive=false
     check_container_status "wealist-noti-service" || all_alive=false
+    check_container_status "wealist-storage-service" || all_alive=false
+    check_container_status "wealist-video-service" || all_alive=false
 
     echo ""
 
@@ -309,9 +343,18 @@ main() {
     echo "    - liveness:  /actuator/health/liveness"
     echo "    - readiness: /actuator/health/readiness (Redis 체크)"
     echo ""
-    echo -e "  ${CYAN}user/board/chat/noti-service${NC}  (Go)"
+    echo -e "  ${CYAN}user/board/chat/noti/storage-service${NC}  (Go)"
     echo "    - liveness:  /health"
     echo "    - readiness: /ready (PostgreSQL 체크)"
+    echo ""
+    echo -e "  ${CYAN}video-service${NC}  (Go)"
+    echo "    - liveness:  /health"
+    echo "    - readiness: /ready (PostgreSQL, Redis, LiveKit 체크)"
+    echo ""
+    echo -e "  ${CYAN}Monitoring${NC}"
+    echo "    - prometheus: /-/healthy"
+    echo "    - grafana:    /api/health"
+    echo "    - loki:       /ready"
     echo ""
 }
 
