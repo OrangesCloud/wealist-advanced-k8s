@@ -3,9 +3,9 @@ package router
 import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 
 	"storage-service/internal/client"
+	"storage-service/internal/database"
 	"storage-service/internal/handler"
 	"storage-service/internal/middleware"
 	"storage-service/internal/repository"
@@ -14,7 +14,6 @@ import (
 
 // Config holds router configuration
 type Config struct {
-	DB          *gorm.DB
 	Logger      *zap.Logger
 	JWTSecret   string
 	BasePath    string
@@ -47,26 +46,18 @@ func Setup(cfg Config) *gin.Engine {
 		c.JSON(200, gin.H{"status": "healthy", "service": "storage-service"})
 	})
 	r.GET("/ready", func(c *gin.Context) {
-		if cfg.DB == nil {
-			c.JSON(503, gin.H{"status": "not ready", "service": "storage-service"})
-			return
-		}
-		sqlDB, err := cfg.DB.DB()
-		if err != nil {
-			c.JSON(503, gin.H{"status": "not ready", "service": "storage-service"})
-			return
-		}
-		if err := sqlDB.Ping(); err != nil {
-			c.JSON(503, gin.H{"status": "not ready", "service": "storage-service"})
+		if !database.IsConnected() {
+			c.JSON(503, gin.H{"status": "not ready", "reason": "database not connected", "service": "storage-service"})
 			return
 		}
 		c.JSON(200, gin.H{"status": "ready", "service": "storage-service"})
 	})
 
-	// Initialize repositories
-	folderRepo := repository.NewFolderRepository(cfg.DB)
-	fileRepo := repository.NewFileRepository(cfg.DB)
-	shareRepo := repository.NewShareRepository(cfg.DB)
+	// Initialize repositories (DB는 전역에서 가져옴)
+	db := database.GetDB()
+	folderRepo := repository.NewFolderRepository(db)
+	fileRepo := repository.NewFileRepository(db)
+	shareRepo := repository.NewShareRepository(db)
 
 	// Initialize services
 	folderService := service.NewFolderService(folderRepo, fileRepo, cfg.Logger)
