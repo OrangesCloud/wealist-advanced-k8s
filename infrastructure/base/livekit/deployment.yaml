@@ -19,6 +19,9 @@ spec:
       containers:
         - name: livekit
           image: livekit/livekit-server:v1.5
+          env:
+            - name: LIVEKIT_PORT
+              value: "7880"
           args:
             - --config
             - /etc/livekit.yaml
