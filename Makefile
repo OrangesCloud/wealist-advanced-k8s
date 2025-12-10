@@ -97,19 +97,24 @@ build-frontend:
 # Kind (Local Kubernetes Cluster)
 # =============================================================================
 
+# KIND_CONFIG: kind-config (default), kind-config-single, kind-config-ha
+KIND_CONFIG ?= kind-config
+
 kind-create:
-	kind create cluster --config infrastructure/kind/kind-config.yaml
+	kind create cluster --config infrastructure/kind/$(KIND_CONFIG).yaml
 	@echo "Kind cluster '$(KIND_CLUSTER)' created successfully"
 	@echo ""
 	@echo "Next steps:"
 	@echo "  1. make ingress-install  # Install nginx-ingress controller"
 	@echo "  2. make k8s-apply-local  # Deploy services"
 	@echo ""
-	@echo "Access via Ingress (http://localhost):"
-	@echo "  - /              -> frontend"
-	@echo "  - /oauth2        -> auth-service (OAuth2)"
-	@echo "  - /api/users     -> user-service"
-	@echo "  - /api/boards    -> board-service"
+	@echo "SSH 터널링: ssh -L 8080:localhost:80 ..."
+	@echo "브라우저: http://localhost:8080"
+
+# 노드 구성 옵션:
+#   make kind-create                          # 기본 (1 master + 2 workers)
+#   make kind-create KIND_CONFIG=kind-config-single  # 싱글 노드
+#   make kind-create KIND_CONFIG=kind-config-ha      # HA (3 masters + 3 workers)
 
 kind-delete:
 	kind delete cluster --name $(KIND_CLUSTER)
