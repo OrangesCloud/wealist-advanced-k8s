@@ -20,10 +20,12 @@ help:
 	@echo "    make build-<service> - Build specific service (e.g., build-user-service)"
 	@echo ""
 	@echo "  Kind (Local Kubernetes):"
-	@echo "    make kind-create        - Create kind cluster"
+	@echo "    make kind-create        - Create kind cluster with Ingress support"
 	@echo "    make kind-delete        - Delete kind cluster"
 	@echo "    make kind-load-all      - Load all images to kind cluster"
 	@echo "    make kind-load-<svc>    - Load specific service image to kind"
+	@echo "    make ingress-install    - Install nginx-ingress controller"
+	@echo "    make ingress-status     - Check ingress controller status"
 	@echo ""
 	@echo "  Kubernetes (Local/Kind):"
 	@echo "    make k8s-apply-local    - Load images & apply k8s manifests (local)"
@@ -96,11 +98,38 @@ build-frontend:
 # =============================================================================
 
 kind-create:
-	kind create cluster --name $(KIND_CLUSTER)
+	kind create cluster --config infrastructure/kind/kind-config.yaml
 	@echo "Kind cluster '$(KIND_CLUSTER)' created successfully"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. make ingress-install  # Install nginx-ingress controller"
+	@echo "  2. make k8s-apply-local  # Deploy services"
+	@echo ""
+	@echo "Access via Ingress (http://localhost):"
+	@echo "  - /              -> frontend"
+	@echo "  - /oauth2        -> auth-service (OAuth2)"
+	@echo "  - /api/users     -> user-service"
+	@echo "  - /api/boards    -> board-service"
 
 kind-delete:
 	kind delete cluster --name $(KIND_CLUSTER)
+
+# Install nginx-ingress controller for Kind
+ingress-install:
+	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+	@echo "Waiting for ingress-nginx controller to be ready..."
+	kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=120s
+	@echo "nginx-ingress controller installed successfully!"
+
+ingress-status:
+	@echo "=== Ingress Controller ==="
+	kubectl get pods -n ingress-nginx
+	@echo ""
+	@echo "=== Ingress Resources ==="
+	kubectl get ingress -n wealist-app 2>/dev/null || echo "No ingress in wealist-app"
 
 kind-load-all: $(addprefix kind-load-,$(SERVICES))
 	@echo "All images loaded to kind cluster '$(KIND_CLUSTER)'"

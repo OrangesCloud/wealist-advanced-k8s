@@ -5,17 +5,18 @@ import { useTheme } from '../contexts/ThemeContext';
 // 1. Base URL 결정 (dev.sh에서 주입된 값 또는 하드코딩된 배포 도메인)
 const BASE_DOMAIN = import.meta.env.VITE_API_BASE_URL || 'https://api.wealist.co.kr';
 
-// 2. 로컬 개발 환경(development)일 경우에만 8080 포트를 붙입니다.
-// 이 조건문은 VITE_API_BASE_URL이 'http://localhost'일 때만 포트가 붙도록 보장합니다.
-// 배포 환경(production)에서는 포트가 붙지 않습니다.
-const OAUTH_BASE =
-  BASE_DOMAIN === 'http://localhost' || BASE_DOMAIN.includes('127.0.0.1')
-    ? `${BASE_DOMAIN}:8080`
-    : BASE_DOMAIN + '/api/users';
+// 2. OAuth는 auth-service에서 처리 (Spring Security OAuth2)
+// Ingress를 통해 /oauth2 경로로 auth-service에 접근
+// 로컬 Kind (SSH 터널링): http://localhost:8080
+// 배포: https://api.wealist.co.kr
+const AUTH_BASE = import.meta.env.VITE_AUTH_BASE_URL || 
+  (BASE_DOMAIN === 'http://localhost' || BASE_DOMAIN.includes('127.0.0.1')
+    ? 'http://localhost:8080'  // SSH 터널링으로 Ingress 접근
+    : BASE_DOMAIN);
 
-// ⚠️ 백엔드 OAuth2 인증 시작 엔드포인트
-const GOOGLE_AUTH_URL = `${OAUTH_BASE}/oauth2/authorization/google`;
-console.log(GOOGLE_AUTH_URL);
+// ⚠️ 백엔드 OAuth2 인증 시작 엔드포인트 (auth-service via Ingress)
+const GOOGLE_AUTH_URL = `${AUTH_BASE}/oauth2/authorization/google`;
+console.log('OAuth URL:', GOOGLE_AUTH_URL);
 const AuthPage: React.FC = () => {
   const { theme } = useTheme();
   const navigate = useNavigate();
@@ -43,7 +44,7 @@ const AuthPage: React.FC = () => {
 
   // Google 로그인 핸들러: 리다이렉션만 수행
   const handleGoogleLogin = () => {
-    console.log(OAUTH_BASE);
+    console.log('Auth Base:', AUTH_BASE);
     setError(null);
     setIsLoading(true);
 
