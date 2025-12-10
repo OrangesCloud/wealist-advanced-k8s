@@ -4,7 +4,8 @@ metadata:
   name: auth-service-config
 data:
   SPRING_PROFILES_ACTIVE: "default"
-  SERVER_PORT: "8081"
+  # Server port - application.yml에서 AUTH_SERVICE_PORT 사용
+  AUTH_SERVICE_PORT: "8081"
   # Database
   SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres.wealist-infra.svc.cluster.local:5432/wealist_user_db"
   # Redis

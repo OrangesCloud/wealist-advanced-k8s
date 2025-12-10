@@ -26,13 +26,13 @@ spec:
                 name: auth-service-secret
           livenessProbe:
             httpGet:
-              path: /health/live
+              path: /actuator/health/liveness
               port: 8081
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health/ready
+              path: /actuator/health/readiness
               port: 8081
             initialDelaySeconds: 5
             periodSeconds: 5
