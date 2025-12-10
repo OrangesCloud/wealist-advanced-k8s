@@ -17,6 +17,11 @@ make k8s-deploy-services (빌드 + ns 생성 + 배포)
 -> kubectl get pods -n wealist-dev 로 확인하세요
 make status
 
+## 포트 포워딩 해주세요
+
+kubectl port-forward -n wealist-dev svc/frontend 3000:80
+kubectl port-forward -n wealist-dev svc/auth-service 8080:8080
+
 ## 그 외
 
 kind get clusters (클러스터 확인)
