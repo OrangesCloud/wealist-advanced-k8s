@@ -88,7 +88,7 @@ build-video-service:
 	docker build -t video-service:local -f services/video-service/docker/Dockerfile services/video-service
 
 build-frontend:
-	docker build -t frontend:local -f services/frontend/Dockerfile.local services/frontend
+	docker build -t frontend:local -f services/frontend/Dockerfile services/frontend
 
 # =============================================================================
 # Kind (Local Kubernetes Cluster)
