@@ -19,4 +19,6 @@ RUN pnpm run build || (echo "Build failed. Check Vite config or env vars." && ex
 FROM nginx:stable-alpine
 EXPOSE 80
 COPY --from=builder /app/dist /usr/share/nginx/html
+# SPA 라우팅을 위한 nginx 설정
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 CMD ["nginx", "-g", "daemon off;"]
