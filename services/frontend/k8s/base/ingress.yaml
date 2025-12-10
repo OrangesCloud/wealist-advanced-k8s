@@ -71,11 +71,4 @@ spec:
                 name: user-service
                 port:
                   number: 8080
-          # Board Service - API endpoints
-          - path: /api/boards
-            pathType: Prefix
-            backend:
-              service:
-                name: board-service
-                port:
-                  number: 8000
+          # Note: /api/boards is defined in board-service ingress

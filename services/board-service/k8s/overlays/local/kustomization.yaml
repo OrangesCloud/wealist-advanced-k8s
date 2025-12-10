@@ -41,11 +41,4 @@ patches:
       - op: replace
         path: /stringData/S3_SECRET_KEY
         value: "minioadmin"
-  # Ingress 패치 - Local 환경용
-  - target:
-      kind: Ingress
-      name: board-service
-    patch: |-
-      - op: replace
-        path: /spec/ingressClassName
-        value: "nginx"
+  # Ingress는 infrastructure/base/ingress/에서 통합 관리

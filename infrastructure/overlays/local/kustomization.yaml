@@ -5,3 +5,6 @@ namespace: wealist-infra
 
 resources:
   - ../../base
+
+# Note: Ingress는 wealist-app 네임스페이스에 별도 적용
+# kubectl apply -f infrastructure/base/ingress/wealist-ingress.yaml

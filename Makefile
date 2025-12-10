@@ -174,8 +174,11 @@ k8s-apply-local: kind-load-all
 	kubectl apply -k services/storage-service/k8s/overlays/local
 	kubectl apply -k services/video-service/k8s/overlays/local
 	kubectl apply -k services/frontend/k8s/overlays/local
+	# 통합 Ingress 적용
+	kubectl apply -f infrastructure/base/ingress/wealist-ingress.yaml
 
 k8s-delete-local:
+	kubectl delete -f infrastructure/base/ingress/wealist-ingress.yaml --ignore-not-found
 	kubectl delete -k services/frontend/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/video-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/storage-service/k8s/overlays/local --ignore-not-found
