@@ -25,7 +25,7 @@ patches:
         value: "dev"
       - op: add
         path: /data/OAUTH2_CLIENT_REDIRECT_URI
-        value: "http://localhost:8080/login/oauth2/code/google"
+        value: "http://localhost/login/oauth2/code/google"
       - op: add
         path: /data/OAUTH2_REDIRECT_URL_ENV
-        value: "http://localhost:8080/oauth/callback"
+        value: "http://localhost/oauth/callback"
