@@ -24,6 +24,13 @@ spec:
                 name: wealist-shared-config
             - secretRef:
                 name: wealist-shared-secrets
+          env:
+            - name: AUTH_SERVICE_PORT
+              value: "8080"
+            - name: SPRING_REDIS_HOST
+              value: "redis"
+            - name: SPRING_REDIS_PORT
+              value: "6379"
           livenessProbe:
             httpGet:
               path: /health
