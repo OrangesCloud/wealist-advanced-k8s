@@ -1,0 +1,91 @@
+# ============================================
+# Build Artifacts & Binaries
+# ============================================
+/bin/
+/main
+/board-api
+/api
+*.exe
+*.dll
+*.so
+*.dylib
+
+# ============================================
+# Local Configuration (Sensitive Data)
+# ============================================
+configs/config.yaml
+!configs/config.yaml.example
+.env
+.env.local
+.env.dev
+.env.prod
+docker/env/*
+
+# ============================================
+# IDE & Editor
+# ============================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.iml
+*.iws
+*.ipr
+
+# ============================================
+# OS Generated Files
+# ============================================
+.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# ============================================
+# Go Specific
+# ============================================
+vendor/
+*.out
+coverage.html
+*.test
+
+# ============================================
+# Local Development Data (Docker Volumes)
+# ============================================
+postgres-data/
+redis-data/
+minio-data/
+
+# ============================================
+# File Uploads (Local Development)
+# ============================================
+uploads/
+storage/
+files/
+
+# ============================================
+# Log Files
+# ============================================
+*.log
+
+# ============================================
+# Backup Files
+# ============================================
+*.bak
+
+# ============================================
+# AI Tools & Local Development
+# ============================================
+.claude/
+.claudeignore
+CLAUDE.md
+.kiro/
+
+# ============================================
+# Python (Virtual Environments)
+# ============================================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
