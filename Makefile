@@ -122,12 +122,14 @@ kind-delete:
 # Install nginx-ingress controller for Kind
 ingress-install:
 	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+	@echo "Patching ingress-nginx to run on control-plane node..."
+	kubectl patch deployment ingress-nginx-controller -n ingress-nginx --patch-file infrastructure/kind/ingress-nginx-patch.yaml
 	@echo "Waiting for ingress-nginx controller to be ready..."
 	kubectl wait --namespace ingress-nginx \
 		--for=condition=ready pod \
 		--selector=app.kubernetes.io/component=controller \
 		--timeout=120s
-	@echo "nginx-ingress controller installed successfully!"
+	@echo "nginx-ingress controller installed successfully on control-plane node!"
 
 ingress-status:
 	@echo "=== Ingress Controller ==="
