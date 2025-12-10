@@ -9,13 +9,22 @@ const maxReconnectAttempts = 10;
 const reconnectDelay = 5000;
 
 const getPresenceWebSocketUrl = (token: string): string => {
-  const INJECTED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  // K8s ingress 모드 감지: window.__ENV__.API_BASE_URL === ""
+  const isIngressMode = window.__ENV__?.API_BASE_URL === "";
+
+  if (isIngressMode) {
+    // K8s ingress: /svc/chat prefix 사용, 같은 origin의 WebSocket
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/svc/chat/api/chats/ws/presence?token=${encodeURIComponent(token)}`;
+  }
+
+  const INJECTED_API_BASE_URL = window.__ENV__?.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
 
   if (INJECTED_API_BASE_URL) {
     const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
 
     if (isLocalDevelopment) {
-      // Local: Chat Service 직접 연결
+      // Docker-compose: Chat Service 직접 연결
       return `ws://localhost:8001/api/chats/ws/presence?token=${encodeURIComponent(token)}`;
     }
 

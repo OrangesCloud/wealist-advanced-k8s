@@ -65,11 +65,21 @@ export const deleteNotification = async (notificationId: string): Promise<void> 
  */
 export const getSSEStreamUrl = (): string => {
   const token = localStorage.getItem('accessToken');
-  const INJECTED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+  // K8s ingress 모드 감지: window.__ENV__.API_BASE_URL === ""
+  const isIngressMode = window.__ENV__?.API_BASE_URL === "";
+
+  if (isIngressMode) {
+    // K8s ingress: /svc/noti prefix 사용
+    return `${window.location.origin}/svc/noti/api/notifications/stream?token=${encodeURIComponent(token || '')}`;
+  }
+
+  const INJECTED_API_BASE_URL = window.__ENV__?.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
 
   if (INJECTED_API_BASE_URL) {
     const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
     if (isLocalDevelopment) {
+      // Docker-compose: 직접 포트 연결
       return `http://localhost:8002/api/notifications/stream?token=${encodeURIComponent(token || '')}`;
     }
   }

@@ -17,7 +17,9 @@ make k8s-deploy-services (빌드 + ns 생성 + 배포)
 -> kubectl get pods -n wealist-dev 로 확인하세요
 make status
 
-## ingress 적용!!! > locahost로 접속하세요
+## 포트포워딩 대신 로컬에 등록해서 wealist.local로
+
+echo "127.0.0.1 wealist.local" | sudo tee -a /etc/hosts
 
 ## 그 외
 

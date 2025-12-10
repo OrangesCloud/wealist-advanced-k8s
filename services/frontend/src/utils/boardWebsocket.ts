@@ -13,13 +13,22 @@ export const WS_BOARD_MTH = [
 export type WSBoardMethod = (typeof WS_BOARD_MTH)[number];
 
 const getWebSocketUrl = (projectId: string, token: string): string => {
-  const INJECTED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  // K8s ingress 모드 감지: window.__ENV__.API_BASE_URL === ""
+  const isIngressMode = window.__ENV__?.API_BASE_URL === "";
+
+  if (isIngressMode) {
+    // K8s ingress: /svc/board prefix 사용
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/svc/board/api/boards/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
+  }
+
+  const INJECTED_API_BASE_URL = window.__ENV__?.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
 
   if (INJECTED_API_BASE_URL) {
     const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
 
     if (isLocalDevelopment) {
-      // Local: Board Service 직접 연결 (chat-service와 동일한 패턴)
+      // Docker-compose: Board Service 직접 연결
       return `ws://localhost:8000/api/boards/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
     }
 
@@ -27,7 +36,7 @@ const getWebSocketUrl = (projectId: string, token: string): string => {
     const protocol = INJECTED_API_BASE_URL.startsWith('https') ? 'wss:' : 'ws:';
     const host = INJECTED_API_BASE_URL.replace(/^https?:\/\//, '');
 
-    // 🔥 /api/boards/ws/project/{projectId} (chat-service와 동일한 패턴)
+    // 🔥 /api/boards/ws/project/{projectId}
     return `${protocol}//${host}/api/boards/ws/project/${projectId}?token=${encodeURIComponent(
       token,
     )}`;
