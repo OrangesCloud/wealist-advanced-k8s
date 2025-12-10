@@ -11,5 +11,6 @@ data:
   # Redis
   SPRING_DATA_REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
   SPRING_DATA_REDIS_PORT: "6379"
+  SPRING_DATA_REDIS_PASSWORD: "redis_password"
   # Service URLs
   USER_SERVICE_URL: "http://user-service:8080"
