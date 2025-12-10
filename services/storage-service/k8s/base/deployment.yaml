@@ -21,7 +21,7 @@ spec:
           image: wealist/storage-service:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8003
+            - containerPort: 8086
               protocol: TCP
           envFrom:
             - configMapRef:
@@ -38,16 +38,16 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8003
-            initialDelaySeconds: 10
+              port: 8086
+            initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 3
-            failureThreshold: 3
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8003
-            initialDelaySeconds: 5
+              port: 8086
+            initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 3
-            failureThreshold: 3
+            failureThreshold: 12

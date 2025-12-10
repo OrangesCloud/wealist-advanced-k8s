@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: wealist-dev
+namespace: wealist-app
 
 resources:
   - ../../base
@@ -13,7 +13,7 @@ images:
 
 replicas:
   - name: board-service
-    count: 1
+    count: 2
 
 patches:
   # ConfigMap 패치 - Local 개발 환경 설정
@@ -41,11 +41,4 @@ patches:
       - op: replace
         path: /stringData/S3_SECRET_KEY
         value: "minioadmin"
-  # Ingress 패치 - Local 환경용
-  - target:
-      kind: Ingress
-      name: board-service
-    patch: |-
-      - op: replace
-        path: /spec/ingressClassName
-        value: "nginx"
+  # Ingress는 infrastructure/base/ingress/에서 통합 관리

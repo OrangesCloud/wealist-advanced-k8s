@@ -5,7 +5,7 @@ metadata:
   labels:
     app: noti-service
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: noti-service
@@ -26,13 +26,13 @@ spec:
                 name: noti-service-secret
           livenessProbe:
             httpGet:
-              path: /health/live
+              path: /health
               port: 8084
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health/ready
+              path: /ready
               port: 8084
             initialDelaySeconds: 5
             periodSeconds: 5

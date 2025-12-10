@@ -1,0 +1,23 @@
+# Patch for ingress-nginx controller to run on control-plane node
+# This ensures hostPort mapping works correctly in Kind cluster
+#
+# Apply after installing ingress-nginx:
+#   kubectl patch deployment ingress-nginx-controller -n ingress-nginx --patch-file infrastructure/kind/ingress-nginx-patch.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+spec:
+  template:
+    spec:
+      nodeSelector:
+        ingress-ready: "true"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule

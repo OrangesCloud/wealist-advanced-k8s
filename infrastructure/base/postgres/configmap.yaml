@@ -7,37 +7,41 @@ data:
     #!/bin/bash
     set -e
 
-    # Create databases for each service
+    # Create databases for each service (matching .env.dev.example)
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
         -- Create databases
-        CREATE DATABASE user_db;
-        CREATE DATABASE auth_db;
-        CREATE DATABASE board_db;
-        CREATE DATABASE chat_db;
-        CREATE DATABASE noti_db;
+        CREATE DATABASE wealist_user_db;
+        CREATE DATABASE wealist_board_db;
+        CREATE DATABASE wealist_chat_db;
+        CREATE DATABASE wealist_noti_db;
+        CREATE DATABASE wealist_storage_db;
+        CREATE DATABASE wealist_video_db;
 
-        -- Create users for each service
-        CREATE USER user_service WITH PASSWORD 'user_service_pass';
-        CREATE USER auth_service WITH PASSWORD 'auth_service_pass';
-        CREATE USER board_service WITH PASSWORD 'board_service_pass';
-        CREATE USER chat_service WITH PASSWORD 'chat_service_pass';
-        CREATE USER noti_service WITH PASSWORD 'noti_service_pass';
+        -- Create users for each service (passwords match .env.dev.example)
+        CREATE USER user_service WITH PASSWORD 'user_service_password';
+        CREATE USER board_service WITH PASSWORD 'board_service_password';
+        CREATE USER chat_service WITH PASSWORD 'chat_service_password';
+        CREATE USER noti_service WITH PASSWORD 'noti_service_password';
+        CREATE USER storage_service WITH PASSWORD 'storage_service_password';
+        CREATE USER video_service WITH PASSWORD 'video_service_password';
 
         -- Grant privileges
-        GRANT ALL PRIVILEGES ON DATABASE user_db TO user_service;
-        GRANT ALL PRIVILEGES ON DATABASE auth_db TO auth_service;
-        GRANT ALL PRIVILEGES ON DATABASE board_db TO board_service;
-        GRANT ALL PRIVILEGES ON DATABASE chat_db TO chat_service;
-        GRANT ALL PRIVILEGES ON DATABASE noti_db TO noti_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_user_db TO user_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_board_db TO board_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_chat_db TO chat_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_noti_db TO noti_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_storage_db TO storage_service;
+        GRANT ALL PRIVILEGES ON DATABASE wealist_video_db TO video_service;
     EOSQL
 
     # Grant schema privileges for each database
-    for db in user_db auth_db board_db chat_db noti_db; do
-        user="${db%_db}_service"
+    for db in wealist_user_db wealist_board_db wealist_chat_db wealist_noti_db wealist_storage_db wealist_video_db; do
+        # Extract service name: wealist_user_db -> user_service
+        service_name=$(echo "$db" | sed 's/wealist_//' | sed 's/_db/_service/')
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" -d "$db" <<-EOSQL
-            GRANT ALL ON SCHEMA public TO $user;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $user;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $user;
+            GRANT ALL ON SCHEMA public TO $service_name;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $service_name;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $service_name;
     EOSQL
     done
 

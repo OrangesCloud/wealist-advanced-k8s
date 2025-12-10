@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"video-service/internal/database"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -39,20 +40,11 @@ func (h *HealthHandler) Health(c *gin.Context) {
 // @Failure 503 {object} map[string]string
 // @Router /ready [get]
 func (h *HealthHandler) Ready(c *gin.Context) {
-	// Check database connection
-	sqlDB, err := h.db.DB()
-	if err != nil {
+	// Check database connection using global DB instance
+	if !database.IsConnected() {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "not ready",
-			"error":  "database connection failed",
-		})
-		return
-	}
-
-	if err := sqlDB.Ping(); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "not ready",
-			"error":  "database ping failed",
+			"error":  "database not connected",
 		})
 		return
 	}

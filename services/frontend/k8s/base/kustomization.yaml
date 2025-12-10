@@ -5,6 +5,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - configmap.yaml
+  # ingress.yaml - 통합 ingress로 이동 (infrastructure/base/ingress/)
 
 labels:
   - pairs:

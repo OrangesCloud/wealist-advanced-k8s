@@ -5,12 +5,8 @@ metadata:
 data:
   PORT: "8083"
   GIN_MODE: "release"
-  # Database
-  DB_HOST: "postgres"
-  DB_PORT: "5432"
-  DB_NAME: "chat_db"
-  # Redis
-  REDIS_HOST: "redis"
+  # Redis (host/port only - password in secret)
+  REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
   REDIS_PORT: "6379"
   # Service URLs
   USER_SERVICE_URL: "http://user-service:8080"

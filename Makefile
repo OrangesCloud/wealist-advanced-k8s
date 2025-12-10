@@ -1,7 +1,8 @@
 .PHONY: help dev-up dev-down dev-logs build-all build-% deploy-local deploy-eks clean
 
 # Kind cluster name (default: wealist)
-KIND_CLUSTER ?= wealist
+KIND_CLUSTER ?= wealist-project
+
 
 # Default target
 help:
@@ -19,10 +20,12 @@ help:
 	@echo "    make build-<service> - Build specific service (e.g., build-user-service)"
 	@echo ""
 	@echo "  Kind (Local Kubernetes):"
-	@echo "    make kind-create        - Create kind cluster"
+	@echo "    make kind-create        - Create kind cluster with Ingress support"
 	@echo "    make kind-delete        - Delete kind cluster"
 	@echo "    make kind-load-all      - Load all images to kind cluster"
 	@echo "    make kind-load-<svc>    - Load specific service image to kind"
+	@echo "    make ingress-install    - Install nginx-ingress controller"
+	@echo "    make ingress-status     - Check ingress controller status"
 	@echo ""
 	@echo "  Kubernetes (Local/Kind):"
 	@echo "    make k8s-apply-local    - Load images & apply k8s manifests (local)"
@@ -94,12 +97,46 @@ build-frontend:
 # Kind (Local Kubernetes Cluster)
 # =============================================================================
 
+# KIND_CONFIG: kind-config (default), kind-config-single, kind-config-ha
+KIND_CONFIG ?= kind-config
+
 kind-create:
-	kind create cluster --name $(KIND_CLUSTER)
+	kind create cluster --config infrastructure/kind/$(KIND_CONFIG).yaml
 	@echo "Kind cluster '$(KIND_CLUSTER)' created successfully"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. make ingress-install  # Install nginx-ingress controller"
+	@echo "  2. make k8s-apply-local  # Deploy services"
+	@echo ""
+	@echo "SSH 터널링: ssh -L 8080:localhost:80 ..."
+	@echo "브라우저: http://localhost:8080"
+
+# 노드 구성 옵션:
+#   make kind-create                          # 기본 (1 master + 2 workers)
+#   make kind-create KIND_CONFIG=kind-config-single  # 싱글 노드
+#   make kind-create KIND_CONFIG=kind-config-ha      # HA (3 masters + 3 workers)
 
 kind-delete:
 	kind delete cluster --name $(KIND_CLUSTER)
+
+# Install nginx-ingress controller for Kind
+ingress-install:
+	kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+	@echo "Patching ingress-nginx to run on control-plane node..."
+	kubectl patch deployment ingress-nginx-controller -n ingress-nginx --patch-file infrastructure/kind/ingress-nginx-patch.yaml
+	@echo "Waiting for ingress-nginx controller to be ready..."
+	kubectl wait --namespace ingress-nginx \
+		--for=condition=ready pod \
+		--selector=app.kubernetes.io/component=controller \
+		--timeout=120s
+	@echo "nginx-ingress controller installed successfully on control-plane node!"
+
+ingress-status:
+	@echo "=== Ingress Controller ==="
+	kubectl get pods -n ingress-nginx
+	@echo ""
+	@echo "=== Ingress Resources ==="
+	kubectl get ingress -n wealist-app 2>/dev/null || echo "No ingress in wealist-app"
 
 kind-load-all: $(addprefix kind-load-,$(SERVICES))
 	@echo "All images loaded to kind cluster '$(KIND_CLUSTER)'"
@@ -133,6 +170,8 @@ kind-load-frontend:
 # =============================================================================
 
 k8s-apply-local: kind-load-all
+	kubectl apply -f services/namespace.yaml
+
 	kubectl apply -k infrastructure/overlays/local
 	kubectl apply -k services/user-service/k8s/overlays/local
 	kubectl apply -k services/auth-service/k8s/overlays/local
@@ -142,8 +181,11 @@ k8s-apply-local: kind-load-all
 	kubectl apply -k services/storage-service/k8s/overlays/local
 	kubectl apply -k services/video-service/k8s/overlays/local
 	kubectl apply -k services/frontend/k8s/overlays/local
+	# 통합 Ingress 적용
+	kubectl apply -f infrastructure/base/ingress/wealist-ingress.yaml
 
 k8s-delete-local:
+	kubectl delete -f infrastructure/base/ingress/wealist-ingress.yaml --ignore-not-found
 	kubectl delete -k services/frontend/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/video-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/storage-service/k8s/overlays/local --ignore-not-found
@@ -153,6 +195,7 @@ k8s-delete-local:
 	kubectl delete -k services/auth-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k services/user-service/k8s/overlays/local --ignore-not-found
 	kubectl delete -k infrastructure/overlays/local --ignore-not-found
+	kubectl delete -f services/namespace.yaml --ignore-not-found
 
 # Preview kustomize output
 kustomize-infra:
@@ -226,5 +269,8 @@ status:
 	@echo "=== Docker Containers ==="
 	docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 	@echo ""
-	@echo "=== Kubernetes Pods (wealist-dev) ==="
-	kubectl get pods -n wealist-dev 2>/dev/null || echo "Namespace not found"
+	@echo "=== Kubernetes Pods (wealist-app) ==="
+	kubectl get pods -n wealist-app 2>/dev/null || echo "Namespace wealist-app not found"
+	@echo ""
+	@echo "=== Kubernetes Pods (wealist-infra) ==="
+	kubectl get pods -n wealist-infra 2>/dev/null || echo "Namespace wealist-infra not found"

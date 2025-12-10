@@ -36,11 +36,11 @@ interface SuccessResponse<T> {
 
 /**
  * 폴더 생성
- * [API] POST /storage/folders
+ * [API] POST /folders
  */
 export const createFolder = async (data: CreateFolderRequest): Promise<StorageFolder> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.post(
-    '/storage/folders',
+    '/folders',
     data,
   );
   return response.data.data;
@@ -48,25 +48,25 @@ export const createFolder = async (data: CreateFolderRequest): Promise<StorageFo
 
 /**
  * 폴더 조회
- * [API] GET /storage/folders/{folderId}
+ * [API] GET /folders/{folderId}
  */
 export const getFolder = async (folderId: string): Promise<StorageFolder> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.get(
-    `/storage/folders/${folderId}`,
+    `/folders/${folderId}`,
   );
   return response.data.data;
 };
 
 /**
  * 폴더 내용 조회 (서브폴더 + 파일)
- * [API] GET /storage/folders/contents?workspaceId=...&folderId=...
+ * [API] GET /folders/contents?workspaceId=...&folderId=...
  */
 export const getFolderContents = async (
   workspaceId: string,
   folderId: string,
 ): Promise<FolderContentsResponse> => {
   const response: AxiosResponse<SuccessResponse<FolderContentsResponse>> =
-    await storageServiceClient.get('/storage/folders/contents', {
+    await storageServiceClient.get('/folders/contents', {
       params: { workspaceId, folderId },
     });
   return response.data.data;
@@ -74,22 +74,22 @@ export const getFolderContents = async (
 
 /**
  * 워크스페이스 루트 폴더 목록 조회
- * [API] GET /storage/workspaces/{workspaceId}/folders
+ * [API] GET /workspaces/{workspaceId}/folders
  */
 export const getRootFolders = async (workspaceId: string): Promise<StorageFolder[]> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/folders`,
+    `/workspaces/${workspaceId}/folders`,
   );
   return response.data.data || [];
 };
 
 /**
  * 워크스페이스 루트 내용 조회 (폴더 + 파일)
- * [API] GET /storage/folders/contents?workspaceId=...
+ * [API] GET /folders/contents?workspaceId=...
  */
 export const getRootContents = async (workspaceId: string): Promise<FolderContentsResponse> => {
   const response: AxiosResponse<SuccessResponse<FolderContentsResponse>> =
-    await storageServiceClient.get('/storage/folders/contents', {
+    await storageServiceClient.get('/folders/contents', {
       params: { workspaceId },
     });
   return response.data.data;
@@ -97,25 +97,25 @@ export const getRootContents = async (workspaceId: string): Promise<FolderConten
 
 /**
  * 폴더 트리 조회
- * [API] GET /storage/workspaces/{workspaceId}/folders
+ * [API] GET /workspaces/{workspaceId}/folders
  */
 export const getFolderTree = async (workspaceId: string): Promise<StorageFolder[]> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/folders`,
+    `/workspaces/${workspaceId}/folders`,
   );
   return response.data.data || [];
 };
 
 /**
  * 폴더 수정
- * [API] PUT /storage/folders/{folderId}
+ * [API] PUT /folders/{folderId}
  */
 export const updateFolder = async (
   folderId: string,
   data: UpdateFolderRequest,
 ): Promise<StorageFolder> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.put(
-    `/storage/folders/${folderId}`,
+    `/folders/${folderId}`,
     data,
   );
   return response.data.data;
@@ -123,27 +123,27 @@ export const updateFolder = async (
 
 /**
  * 폴더 삭제 (휴지통으로 이동)
- * [API] DELETE /storage/folders/{folderId}
+ * [API] DELETE /folders/{folderId}
  */
 export const deleteFolder = async (folderId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/folders/${folderId}`);
+  await storageServiceClient.delete(`/folders/${folderId}`);
 };
 
 /**
  * 폴더 영구 삭제
- * [API] DELETE /storage/folders/{folderId}/permanent
+ * [API] DELETE /folders/{folderId}/permanent
  */
 export const deleteFolderPermanent = async (folderId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/folders/${folderId}/permanent`);
+  await storageServiceClient.delete(`/folders/${folderId}/permanent`);
 };
 
 /**
  * 폴더 복원
- * [API] POST /storage/folders/{folderId}/restore
+ * [API] POST /folders/{folderId}/restore
  */
 export const restoreFolder = async (folderId: string): Promise<StorageFolder> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder>> = await storageServiceClient.post(
-    `/storage/folders/${folderId}/restore`,
+    `/folders/${folderId}/restore`,
   );
   return response.data.data;
 };
@@ -154,13 +154,13 @@ export const restoreFolder = async (folderId: string): Promise<StorageFolder> =>
 
 /**
  * 업로드 URL 생성
- * [API] POST /storage/files/upload-url
+ * [API] POST /files/upload-url
  */
 export const generateUploadURL = async (
   data: GenerateUploadURLRequest,
 ): Promise<GenerateUploadURLResponse> => {
   const response: AxiosResponse<SuccessResponse<GenerateUploadURLResponse>> =
-    await storageServiceClient.post('/storage/files/upload-url', data);
+    await storageServiceClient.post('/files/upload-url', data);
   return response.data.data;
 };
 
@@ -177,11 +177,11 @@ export const uploadFileToS3 = async (uploadUrl: string, file: File): Promise<voi
 
 /**
  * 업로드 확인
- * [API] POST /storage/files/confirm
+ * [API] POST /files/confirm
  */
 export const confirmUpload = async (data: ConfirmUploadRequest): Promise<StorageFile> => {
   const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.post(
-    '/storage/files/confirm',
+    '/files/confirm',
     data,
   );
   return response.data.data;
@@ -229,18 +229,18 @@ export const uploadFile = async (
 
 /**
  * 파일 조회
- * [API] GET /storage/files/{fileId}
+ * [API] GET /files/{fileId}
  */
 export const getFile = async (fileId: string): Promise<StorageFile> => {
   const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.get(
-    `/storage/files/${fileId}`,
+    `/files/${fileId}`,
   );
   return response.data.data;
 };
 
 /**
  * 폴더 내 파일 목록 조회
- * [API] GET /storage/files/folder/{folderId}
+ * [API] GET /files/folder/{folderId}
  */
 export const getFilesByFolder = async (
   folderId: string,
@@ -248,7 +248,7 @@ export const getFilesByFolder = async (
   pageSize: number = 50,
 ): Promise<FileListResponse> => {
   const response: AxiosResponse<SuccessResponse<FileListResponse>> = await storageServiceClient.get(
-    `/storage/files/folder/${folderId}`,
+    `/files/folder/${folderId}`,
     {
       params: { page, pageSize },
     },
@@ -258,7 +258,7 @@ export const getFilesByFolder = async (
 
 /**
  * 워크스페이스 루트 파일 목록 조회
- * [API] GET /storage/files/workspace/{workspaceId}/root
+ * [API] GET /files/workspace/{workspaceId}/root
  */
 export const getRootFiles = async (
   workspaceId: string,
@@ -266,7 +266,7 @@ export const getRootFiles = async (
   pageSize: number = 50,
 ): Promise<FileListResponse> => {
   const response: AxiosResponse<SuccessResponse<FileListResponse>> = await storageServiceClient.get(
-    `/storage/files/workspace/${workspaceId}/root`,
+    `/files/workspace/${workspaceId}/root`,
     {
       params: { page, pageSize },
     },
@@ -276,11 +276,11 @@ export const getRootFiles = async (
 
 /**
  * 파일 수정
- * [API] PUT /storage/files/{fileId}
+ * [API] PUT /files/{fileId}
  */
 export const updateFile = async (fileId: string, data: UpdateFileRequest): Promise<StorageFile> => {
   const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.put(
-    `/storage/files/${fileId}`,
+    `/files/${fileId}`,
     data,
   );
   return response.data.data;
@@ -288,38 +288,38 @@ export const updateFile = async (fileId: string, data: UpdateFileRequest): Promi
 
 /**
  * 파일 삭제 (휴지통으로 이동)
- * [API] DELETE /storage/files/{fileId}
+ * [API] DELETE /files/{fileId}
  */
 export const deleteFile = async (fileId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/files/${fileId}`);
+  await storageServiceClient.delete(`/files/${fileId}`);
 };
 
 /**
  * 파일 영구 삭제
- * [API] DELETE /storage/files/{fileId}/permanent
+ * [API] DELETE /files/{fileId}/permanent
  */
 export const deleteFilePermanent = async (fileId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/files/${fileId}/permanent`);
+  await storageServiceClient.delete(`/files/${fileId}/permanent`);
 };
 
 /**
  * 파일 복원
- * [API] POST /storage/files/{fileId}/restore
+ * [API] POST /files/{fileId}/restore
  */
 export const restoreFile = async (fileId: string): Promise<StorageFile> => {
   const response: AxiosResponse<SuccessResponse<StorageFile>> = await storageServiceClient.post(
-    `/storage/files/${fileId}/restore`,
+    `/files/${fileId}/restore`,
   );
   return response.data.data;
 };
 
 /**
  * 파일 다운로드 URL 생성
- * [API] GET /storage/files/{fileId}/download
+ * [API] GET /files/{fileId}/download
  */
 export const getDownloadURL = async (fileId: string): Promise<string> => {
   const response: AxiosResponse<SuccessResponse<{ downloadUrl: string }>> =
-    await storageServiceClient.get(`/storage/files/${fileId}/download`);
+    await storageServiceClient.get(`/files/${fileId}/download`);
   return response.data.data.downloadUrl;
 };
 
@@ -342,11 +342,11 @@ export const downloadFile = async (fileId: string, fileName: string): Promise<vo
 
 /**
  * 공유 생성
- * [API] POST /storage/shares
+ * [API] POST /shares
  */
 export const createShare = async (data: CreateShareRequest): Promise<StorageShare> => {
   const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.post(
-    '/storage/shares',
+    '/shares',
     data,
   );
   return response.data.data;
@@ -354,50 +354,50 @@ export const createShare = async (data: CreateShareRequest): Promise<StorageShar
 
 /**
  * 공유 조회
- * [API] GET /storage/shares/{shareId}
+ * [API] GET /shares/{shareId}
  */
 export const getShare = async (shareId: string): Promise<StorageShare> => {
   const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.get(
-    `/storage/shares/${shareId}`,
+    `/shares/${shareId}`,
   );
   return response.data.data;
 };
 
 /**
  * 엔티티의 공유 목록 조회
- * [API] GET /storage/shares/entity/{entityType}/{entityId}
+ * [API] GET /shares/entity/{entityType}/{entityId}
  */
 export const getSharesByEntity = async (
   entityType: 'FILE' | 'FOLDER',
   entityId: string,
 ): Promise<StorageShare[]> => {
   const response: AxiosResponse<SuccessResponse<StorageShare[]>> = await storageServiceClient.get(
-    `/storage/shares/entity/${entityType}/${entityId}`,
+    `/shares/entity/${entityType}/${entityId}`,
   );
   return response.data.data || [];
 };
 
 /**
  * 나에게 공유된 항목 목록
- * [API] GET /storage/shared-with-me
+ * [API] GET /shared-with-me
  */
 export const getSharedWithMe = async (): Promise<SharedItem[]> => {
   const response: AxiosResponse<SuccessResponse<SharedItem[]>> = await storageServiceClient.get(
-    '/storage/shared-with-me',
+    '/shared-with-me',
   );
   return response.data.data || [];
 };
 
 /**
  * 공유 수정
- * [API] PUT /storage/shares/{shareId}
+ * [API] PUT /shares/{shareId}
  */
 export const updateShare = async (
   shareId: string,
   data: UpdateShareRequest,
 ): Promise<StorageShare> => {
   const response: AxiosResponse<SuccessResponse<StorageShare>> = await storageServiceClient.put(
-    `/storage/shares/${shareId}`,
+    `/shares/${shareId}`,
     data,
   );
   return response.data.data;
@@ -405,15 +405,15 @@ export const updateShare = async (
 
 /**
  * 공유 삭제
- * [API] DELETE /storage/shares/{shareId}
+ * [API] DELETE /shares/{shareId}
  */
 export const deleteShare = async (shareId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/shares/${shareId}`);
+  await storageServiceClient.delete(`/shares/${shareId}`);
 };
 
 /**
  * 공유 링크로 접근
- * [API] GET /public/storage/share/{shareLink}
+ * [API] GET /public/share/{shareLink}
  */
 export const accessShareLink = async (
   shareLink: string,
@@ -438,11 +438,11 @@ export const accessShareLink = async (
 
 /**
  * 워크스페이스 스토리지 사용량 조회
- * [API] GET /storage/workspaces/{workspaceId}/usage
+ * [API] GET /workspaces/{workspaceId}/usage
  */
 export const getStorageUsage = async (workspaceId: string): Promise<StorageUsage> => {
   const response: AxiosResponse<SuccessResponse<StorageUsage>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/usage`,
+    `/workspaces/${workspaceId}/usage`,
   );
   return response.data.data;
 };
@@ -453,32 +453,32 @@ export const getStorageUsage = async (workspaceId: string): Promise<StorageUsage
 
 /**
  * 휴지통 목록 조회 (삭제된 폴더)
- * [API] GET /storage/workspaces/{workspaceId}/trash/folders
+ * [API] GET /workspaces/{workspaceId}/trash/folders
  */
 export const getTrashFolders = async (workspaceId: string): Promise<StorageFolder[]> => {
   const response: AxiosResponse<SuccessResponse<StorageFolder[]>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/trash/folders`,
+    `/workspaces/${workspaceId}/trash/folders`,
   );
   return response.data.data || [];
 };
 
 /**
  * 휴지통 목록 조회 (삭제된 파일)
- * [API] GET /storage/workspaces/{workspaceId}/trash/files
+ * [API] GET /workspaces/{workspaceId}/trash/files
  */
 export const getTrashFiles = async (workspaceId: string): Promise<StorageFile[]> => {
   const response: AxiosResponse<SuccessResponse<StorageFile[]>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/trash/files`,
+    `/workspaces/${workspaceId}/trash/files`,
   );
   return response.data.data || [];
 };
 
 /**
  * 휴지통 비우기
- * [API] DELETE /storage/trash/workspace/{workspaceId}/empty
+ * [API] DELETE /trash/workspace/{workspaceId}/empty
  */
 export const emptyTrash = async (workspaceId: string): Promise<void> => {
-  await storageServiceClient.delete(`/storage/trash/workspace/${workspaceId}/empty`);
+  await storageServiceClient.delete(`/trash/workspace/${workspaceId}/empty`);
 };
 
 // ============================================================================
@@ -487,7 +487,7 @@ export const emptyTrash = async (workspaceId: string): Promise<void> => {
 
 /**
  * 파일/폴더 검색
- * [API] GET /storage/workspaces/{workspaceId}/files/search
+ * [API] GET /workspaces/{workspaceId}/files/search
  */
 export const searchStorage = async (
   workspaceId: string,
@@ -496,7 +496,7 @@ export const searchStorage = async (
 ): Promise<{ files: StorageFile[]; folders: StorageFolder[] }> => {
   const response: AxiosResponse<
     SuccessResponse<{ files: StorageFile[]; folders: StorageFolder[] }>
-  > = await storageServiceClient.get(`/storage/workspaces/${workspaceId}/files/search`, {
+  > = await storageServiceClient.get(`/workspaces/${workspaceId}/files/search`, {
     params: { query, type: type || 'all' },
   });
   return response.data.data;
@@ -508,7 +508,7 @@ export const searchStorage = async (
 
 /**
  * 최근 파일 목록 조회
- * [API] GET /storage/workspaces/{workspaceId}/files
+ * [API] GET /workspaces/{workspaceId}/files
  * Note: Backend에서 최근 파일 정렬을 지원하지 않으므로 전체 파일 목록에서 최근 순으로 정렬
  */
 export const getRecentFiles = async (
@@ -516,7 +516,7 @@ export const getRecentFiles = async (
   limit: number = 20,
 ): Promise<StorageFile[]> => {
   const response: AxiosResponse<SuccessResponse<StorageFile[]>> = await storageServiceClient.get(
-    `/storage/workspaces/${workspaceId}/files`,
+    `/workspaces/${workspaceId}/files`,
   );
   const files = response.data.data || [];
   // 최근 수정된 순으로 정렬 후 limit만큼 반환
@@ -538,7 +538,7 @@ export const addToStarred = async (): // entityType: 'FILE' | 'FOLDER',
 // entityId: string,
 Promise<void> => {
   console.warn('Starred feature not yet implemented in backend');
-  // TODO: await storageServiceClient.post('/storage/starred', { entityType, entityId });
+  // TODO: await storageServiceClient.post('/starred', { entityType, entityId });
 };
 
 /**
@@ -549,7 +549,7 @@ export const removeFromStarred = async (): // entityType: 'FILE' | 'FOLDER',
 // entityId: string
 Promise<void> => {
   console.warn('Starred feature not yet implemented in backend');
-  // TODO: await storageServiceClient.delete(`/storage/starred/${entityType}/${entityId}`);
+  // TODO: await storageServiceClient.delete(`/starred/${entityType}/${entityId}`);
 };
 
 /**
