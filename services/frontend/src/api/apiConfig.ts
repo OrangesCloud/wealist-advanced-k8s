@@ -241,8 +241,8 @@ const getServiceBaseUrl = (serviceName: ServiceName): string => {
     // K8s 환경: Ingress가 /api/{service}/* → 서비스 내부 /api/* 라우팅
     fullUrl = servicePath;
   } else if (config.deploymentEnv === 'docker-compose') {
-    // Docker Compose 환경: 직접 서비스 포트 접근, 서비스 내부에서 /api/* 라우팅
-    fullUrl = baseUrl + '/api';
+    // Docker Compose 환경: 직접 서비스 포트 접근, 서비스에서 /api 제거된 경로 사용
+    fullUrl = baseUrl;
   } else {
     // CloudFront 환경: API Gateway에서 /api/{service}/* 라우팅
     fullUrl = baseUrl + servicePath;
@@ -261,6 +261,108 @@ const getServiceBaseUrl = (serviceName: ServiceName): string => {
 // ============================================================================
 
 /**
+ * API 클라이언트 초기화 시 base URL 검증
+ */
+const validateClientBaseUrl = (serviceName: ServiceName, baseUrl: string): {
+  isValid: boolean;
+  issues: string[];
+  suggestions: string[];
+} => {
+  const issues: string[] = [];
+  const suggestions: string[] = [];
+  const config = getCurrentEnvironmentConfig();
+  
+  // 기본 URL 유효성 검사
+  if (!baseUrl) {
+    issues.push('Base URL is empty or undefined');
+    suggestions.push(`Set proper environment variables for ${serviceName} service`);
+  }
+  
+  // URL에 undefined가 포함되어 있는지 확인
+  if (baseUrl && baseUrl.includes('undefined')) {
+    issues.push('Base URL contains undefined values');
+    suggestions.push('Check that all required environment variables are properly set');
+  }
+  
+  // 환경별 특정 검증
+  switch (config.deploymentEnv) {
+    case 'docker-compose':
+      if (baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1')) {
+        issues.push('Docker Compose environment should use localhost URLs');
+        suggestions.push('Set VITE_API_BASE_URL=http://localhost in your environment');
+      }
+      break;
+      
+    case 'k8s':
+      if (baseUrl && baseUrl.includes('localhost')) {
+        issues.push('K8s environment should not use localhost URLs');
+        suggestions.push('Use relative paths for K8s Ingress routing');
+      }
+      if (baseUrl && !baseUrl.startsWith('/api/')) {
+        issues.push('K8s environment should use /api/{service} paths');
+        suggestions.push(`Expected path format: /api/${serviceName}`);
+      }
+      break;
+      
+    case 'cloudfront':
+      if (baseUrl && !baseUrl.startsWith('https://')) {
+        issues.push('CloudFront environment should use HTTPS URLs');
+        suggestions.push('Set VITE_API_DOMAIN=https://api.yourdomain.com');
+      }
+      break;
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    issues,
+    suggestions,
+  };
+};
+
+/**
+ * 모든 API 클라이언트의 base URL을 검증합니다
+ */
+const validateAllClientConfigurations = (): boolean => {
+  const services: ServiceName[] = ['auth', 'users', 'boards', 'chat', 'notifications', 'storage'];
+  let allValid = true;
+  
+  console.group('🔍 API Client Configuration Validation');
+  
+  services.forEach(serviceName => {
+    const baseUrl = getServiceBaseUrl(serviceName);
+    const validation = validateClientBaseUrl(serviceName, baseUrl);
+    
+    const icon = validation.isValid ? '✅' : '❌';
+    console.log(`${icon} ${serviceName}: ${baseUrl || '(empty)'}`);
+    
+    if (!validation.isValid) {
+      allValid = false;
+      validation.issues.forEach(issue => {
+        console.warn(`  ⚠️ Issue: ${issue}`);
+      });
+      validation.suggestions.forEach(suggestion => {
+        console.info(`  💡 Suggestion: ${suggestion}`);
+      });
+    }
+  });
+  
+  if (!allValid) {
+    console.error('❌ Some API client configurations are invalid');
+    console.group('🔧 Troubleshooting Steps');
+    console.log('1. Check your environment variables (VITE_DEPLOYMENT_ENV, VITE_API_BASE_URL)');
+    console.log('2. Ensure the deployment environment matches your actual setup');
+    console.log('3. Verify that all required services are running and accessible');
+    console.log('4. Check network connectivity and firewall settings');
+    console.groupEnd();
+  } else {
+    console.log('✅ All API client configurations are valid');
+  }
+  
+  console.groupEnd();
+  return allValid;
+};
+
+/**
  * API 설정 시스템을 초기화합니다
  */
 const initializeApiConfig = (): void => {
@@ -268,8 +370,9 @@ const initializeApiConfig = (): void => {
   if (import.meta.env.DEV) {
     diagnoseEnvironmentConfig();
     
-    // 추가 API 설정 진단
+    // API 클라이언트 설정 검증
     setTimeout(() => {
+      validateAllClientConfigurations();
       diagnoseApiConfiguration();
     }, 100); // 약간의 지연을 두어 다른 로그와 구분
   }
@@ -307,18 +410,116 @@ export const runConfigDiagnosis = (): void => {
 };
 
 /**
- * 서비스별 완전한 API URL을 생성합니다 (디버깅용)
+ * API 클라이언트 설정 검증을 수동으로 실행합니다 (디버깅용)
+ */
+export const validateClientConfigurations = (): boolean => {
+  return validateAllClientConfigurations();
+};
+
+/**
+ * 특정 서비스의 URL 패턴을 검증합니다 (디버깅용)
+ */
+export const validateServiceUrlPattern = (
+  serviceName: ServiceName,
+  path: string = ''
+): {
+  isValid: boolean;
+  expectedPattern: string;
+  actualUrl: string;
+  issues: string[];
+} => {
+  const baseUrl = getServiceBaseUrl(serviceName);
+  const fullUrl = getFullApiUrl(serviceName, path);
+  
+  return validateRequestUrlPattern(serviceName, fullUrl, baseUrl);
+};
+
+/**
+ * 요청 URL이 예상 패턴과 일치하는지 검증합니다
+ */
+const validateRequestUrlPattern = (
+  serviceName: ServiceName,
+  requestUrl: string,
+  baseUrl: string
+): {
+  isValid: boolean;
+  expectedPattern: string;
+  actualUrl: string;
+  issues: string[];
+} => {
+  const config = getCurrentEnvironmentConfig();
+  const issues: string[] = [];
+  let expectedPattern = '';
+  
+  // 환경별 예상 패턴 정의
+  switch (config.deploymentEnv) {
+    case 'docker-compose':
+      expectedPattern = `${baseUrl || 'http://localhost:{port}'}/*`;
+      if (!requestUrl.includes('localhost')) {
+        issues.push('Docker Compose URLs should use localhost');
+      }
+      break;
+      
+    case 'k8s':
+      expectedPattern = `/api/${serviceName}/*`;
+      if (!requestUrl.startsWith(`/api/${serviceName}`)) {
+        issues.push(`K8s URLs should start with /api/${serviceName}`);
+      }
+      break;
+      
+    case 'cloudfront':
+      expectedPattern = `${baseUrl || 'https://api.domain.com'}/api/${serviceName}/*`;
+      if (!requestUrl.includes(`/api/${serviceName}`)) {
+        issues.push(`CloudFront URLs should include /api/${serviceName} path`);
+      }
+      break;
+  }
+  
+  // 중복된 /api 패턴 검사
+  const apiCount = (requestUrl.match(/\/api/g) || []).length;
+  if (apiCount > 1) {
+    issues.push('Duplicate /api prefix detected in URL');
+  }
+  
+  return {
+    isValid: issues.length === 0,
+    expectedPattern,
+    actualUrl: requestUrl,
+    issues,
+  };
+};
+
+/**
+ * 서비스별 완전한 API URL을 생성하고 검증합니다 (디버깅용)
  */
 export const getFullApiUrl = (serviceName: ServiceName, path: string = ''): string => {
   const baseUrl = getServiceBaseUrl(serviceName);
   const servicePath = SERVICE_PATHS[serviceName];
   
+  let fullUrl = '';
+  
   if (!baseUrl) {
     // K8s 환경에서는 상대 경로 사용
-    return `${servicePath}${path}`;
+    fullUrl = `${servicePath}${path}`;
+  } else {
+    fullUrl = `${baseUrl}${path}`;
   }
   
-  return `${baseUrl}${servicePath}${path}`;
+  // 개발 환경에서 URL 패턴 검증
+  if (import.meta.env.DEV) {
+    const validation = validateRequestUrlPattern(serviceName, fullUrl, baseUrl);
+    
+    if (!validation.isValid) {
+      console.warn(`⚠️ URL Pattern Validation Failed for ${serviceName}:`);
+      console.warn(`  Expected: ${validation.expectedPattern}`);
+      console.warn(`  Actual: ${validation.actualUrl}`);
+      validation.issues.forEach(issue => {
+        console.warn(`  Issue: ${issue}`);
+      });
+    }
+  }
+  
+  return fullUrl;
 };
 
 /**
