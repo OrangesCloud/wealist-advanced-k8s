@@ -7,7 +7,7 @@ interface StoragePageProps {
   onLogout: () => void;
 }
 
-const StoragePage: React.FC<StoragePageProps> = ({ onLogout }) => {
+const StoragePage: React.FC<StoragePageProps> = ({ }) => {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const navigate = useNavigate();
 
