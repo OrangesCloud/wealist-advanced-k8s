@@ -1,0 +1,21 @@
+server:
+  port: 8001
+  base_path: /api/chats
+  env: dev
+  log_level: debug
+
+database:
+  url: postgresql://chat_service:chat_service_password@localhost:5432/wealist_chat_db?sslmode=disable
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+auth:
+  service_url: http://localhost:8080
+  secret_key: your-jwt-secret-key
+
+services:
+  user_service_url: http://localhost:8081/api/users

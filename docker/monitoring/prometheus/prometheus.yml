@@ -1,0 +1,88 @@
+# =============================================================================
+# Prometheus Configuration for weAlist
+# =============================================================================
+
+global:
+  scrape_interval: 15s      # 15초마다 메트릭 수집
+  evaluation_interval: 15s  # 15초마다 규칙 평가
+  external_labels:
+    monitor: 'wealist-monitor'
+
+# Alertmanager 설정 (나중에 알림 기능 추가 시 사용)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# 스크래핑 대상 설정
+scrape_configs:
+  # Prometheus 자체 메트릭
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # ==========================================================================
+  # Go Services (user, board, chat, noti, storage, video)
+  # ==========================================================================
+  - job_name: 'user-service'
+    static_configs:
+      - targets: ['user-service:8081']
+    metrics_path: '/metrics'
+
+  - job_name: 'board-service'
+    static_configs:
+      - targets: ['board-service:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'chat-service'
+    static_configs:
+      - targets: ['chat-service:8001']
+    metrics_path: '/metrics'
+
+  - job_name: 'noti-service'
+    static_configs:
+      - targets: ['noti-service:8002']
+    metrics_path: '/metrics'
+
+  - job_name: 'storage-service'
+    static_configs:
+      - targets: ['storage-service:8003']
+    metrics_path: '/metrics'
+
+  - job_name: 'video-service'
+    static_configs:
+      - targets: ['video-service:8004']
+    metrics_path: '/metrics'
+
+  # ==========================================================================
+  # Spring Boot Service (auth-service)
+  # ==========================================================================
+  - job_name: 'auth-service'
+    static_configs:
+      - targets: ['auth-service:8080']
+    metrics_path: '/actuator/prometheus'
+
+  # ==========================================================================
+  # Infrastructure Services
+  # ==========================================================================
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # NGINX (nginx-prometheus-exporter 사용 시)
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
+
+  # MinIO
+  - job_name: 'minio'
+    static_configs:
+      - targets: ['minio:9000']
+    metrics_path: '/minio/v2/metrics/cluster'

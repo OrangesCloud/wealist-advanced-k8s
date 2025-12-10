@@ -1,0 +1,43 @@
+# Chat Service - Standalone Docker Compose
+# 인프라(postgres, redis)가 외부에서 실행 중일 때 단독 실행용
+#
+# 사용법:
+#   docker compose up
+#
+# 주의: 먼저 인프라를 시작하세요
+#   cd ../../docker && ./scripts/dev.sh infra
+
+services:
+  chat-service:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: wealist/chat-service:local
+    container_name: wealist-chat-service-standalone
+    ports:
+      - "8083:8001"
+    environment:
+      - ENV=dev
+      - PORT=8001
+      - SERVER_BASE_PATH=/api/chats
+      - LOG_LEVEL=debug
+      # Database
+      - DATABASE_URL=postgresql://chat_service:chat_service_pass@host.docker.internal:5432/wealist_chat_db?sslmode=disable
+      # Redis
+      - REDIS_HOST=host.docker.internal
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redis_password
+      # JWT
+      - SECRET_KEY=dev-jwt-secret-key-change-in-production
+      # Service URLs
+      - USER_SERVICE_URL=http://host.docker.internal:8081/api/users
+      - AUTH_SERVICE_URL=http://host.docker.internal:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
