@@ -6,6 +6,9 @@ namespace: wealist-app
 resources:
   - ../../base
 
+patchesStrategicMerge:
+  - configmap-patch.yaml
+
 images:
   - name: frontend
     newName: frontend

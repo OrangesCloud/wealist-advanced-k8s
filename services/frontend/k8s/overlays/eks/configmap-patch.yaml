@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  # K8s EKS 환경 설정 - Ingress 라우팅 사용
+  VITE_DEPLOYMENT_ENV: "k8s"
+  VITE_API_BASE_URL: ""  # 상대 경로 사용으로 Ingress가 라우팅 처리
+  VITE_API_DOMAIN: ""    # K8s 환경에서는 사용하지 않음
+  VITE_WS_URL: "/ws"
