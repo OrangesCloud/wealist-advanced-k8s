@@ -6,6 +6,8 @@
 
 # local-kind 환경(ns: wealist-dev)
 
+=> k8s/base/shared/secret-shared.yaml, services/auth-service/k8s/base/secret.yaml 에 google_client 관련 설정해주세요!
+
 make kind-setup (cluster 생성 + nginx controller 셋팅)
 
 make infra-setup (인프라 이미지 로드 + 배포 + 대기)
