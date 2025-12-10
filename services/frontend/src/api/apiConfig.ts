@@ -15,12 +15,12 @@ declare global {
 // - Production: 빌드 시 주입된 URL 사용
 
 // K8s ingress 모드 감지: 명시적으로 빈 문자열이 설정된 경우
-const isIngressMode = window.__ENV__?.API_BASE_URL === "";
+const isIngressMode = window.__ENV__?.API_BASE_URL === '';
 
 // ingress 모드가 아닐 때만 폴백 적용
 const INJECTED_API_BASE_URL = isIngressMode
-  ? ""
-  : (window.__ENV__?.API_BASE_URL || import.meta.env.VITE_API_BASE_URL);
+  ? ''
+  : window.__ENV__?.API_BASE_URL || import.meta.env.VITE_API_BASE_URL;
 
 // ============================================================================
 // 💡 [핵심 수정]: Context Path를 환경에 따라 조건부로 붙입니다.
@@ -33,10 +33,10 @@ const getIngressServicePrefix = (path: string): string => {
   if (path?.includes('/api/users')) return '/svc/user';
   if (path?.includes('/api/workspaces')) return '/svc/user';
   if (path?.includes('/api/profiles')) return '/svc/user';
-  if (path?.includes('/api/boards')) return '/svc/board';
-  if (path?.includes('/api/chats')) return '/svc/chat';
+  if (path?.includes('/api/boards')) return '/svc/board/api';
+  if (path?.includes('/api/chats')) return `/svc/chat${path}`;
   if (path?.includes('/api/notifications')) return '/svc/noti';
-  if (path?.includes('/api/storage')) return '/svc/storage';
+  if (path?.includes('/api/storage')) return '/svc/storage/api';
   if (path?.includes('/api/video')) return '/svc/video';
   return ''; // 매칭 안 되면 prefix 없이
 };
@@ -66,6 +66,7 @@ const getApiBaseUrl = (path: string): string => {
       if (path?.includes('/api/chats')) return `${INJECTED_API_BASE_URL}:8001${path}`;
       if (path?.includes('/api/notifications')) return `${INJECTED_API_BASE_URL}:8002`;
       if (path?.includes('/api/storage')) return `${INJECTED_API_BASE_URL}:8003/api`; // storage-service (base path only)
+      if (path?.includes('/api/video')) return `${INJECTED_API_BASE_URL}:8004`;
     }
 
     return `${INJECTED_API_BASE_URL}${path}`;
