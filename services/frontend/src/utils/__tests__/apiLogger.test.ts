@@ -88,7 +88,8 @@ describe('API Logger Utilities', () => {
           method: 'GET',
           baseURL: '/api/chat',
           url: '/messages',
-        },
+          headers: {},
+        } as any,
         statusText: 'OK',
       };
 
@@ -115,7 +116,8 @@ describe('API Logger Utilities', () => {
           method: 'GET',
           baseURL: '/api/users',
           url: '/profile',
-        },
+          headers: {},
+        } as any,
         statusText: 'Not Found',
       };
 
@@ -139,14 +141,16 @@ describe('API Logger Utilities', () => {
             method: 'POST',
             baseURL: '/api/notifications',
             url: '/send',
-          },
+            headers: {},
+          } as any,
           statusText: 'Method Not Allowed',
         },
         config: {
           method: 'POST',
           baseURL: '/api/notifications',
           url: '/send',
-        },
+          headers: {},
+        } as any,
         message: 'Request failed with status code 405',
         name: 'AxiosError',
         isAxiosError: true,
@@ -174,7 +178,8 @@ describe('API Logger Utilities', () => {
           method: 'GET',
           baseURL: '/api/auth',
           url: '/status',
-        },
+          headers: {},
+        } as any,
         message: 'Network Error',
         name: 'AxiosError',
         code: 'NETWORK_ERROR',
