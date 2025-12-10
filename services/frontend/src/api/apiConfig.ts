@@ -28,23 +28,21 @@ const getApiBaseUrl = (path: string): string => {
     return `${baseUrl}${path}`;
   }
 
-  // k8s (Kind/EKS): Ingress가 모든 라우팅 처리 - 상대 경로 사용
+  // k8s (Kind/EKS): Ingress가 모든 라우팅 처리
+  // baseURL을 빈 문자열로 반환 → axios 호출 시 전체 경로(/api/workspaces/all) 그대로 사용
   if (DEPLOYMENT_ENV === 'k8s') {
-    // 상대 경로 반환 → 브라우저 origin 기준으로 요청
-    return path;
+    return '';
   }
 
   // cloudfront: 별도 API 도메인 사용 (프로덕션)
+  // baseURL만 반환 → axios 호출 시 전체 경로(/api/workspaces/all) 추가됨
   if (DEPLOYMENT_ENV === 'cloudfront') {
     const apiDomain = import.meta.env.VITE_API_DOMAIN || 'https://api.wealist.co.kr';
-    return `${apiDomain}${path}`;
+    return apiDomain;
   }
 
-  // fallback: 환경변수가 있으면 사용, 없으면 프로덕션 도메인
-  if (INJECTED_API_BASE_URL) {
-    return `${INJECTED_API_BASE_URL}${path}`;
-  }
-  return `https://api.wealist.co.kr${path}`;
+  // fallback: 환경변수가 있으면 사용, 없으면 빈 문자열 (상대 경로)
+  return INJECTED_API_BASE_URL || '';
 };
 
 export const AUTH_SERVICE_API_URL = getApiBaseUrl('/api/auth'); // auth-service (토큰 관리)
