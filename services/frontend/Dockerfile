@@ -4,10 +4,16 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # 빌드 타임 환경변수 (VITE_* 변수는 빌드 시점에 주입됨)
-# 기본값: localhost (로컬 K8s용)
-# 프로덕션: docker build --build-arg VITE_API_BASE_URL=https://api.wealist.co.kr
-ARG VITE_API_BASE_URL=http://localhost
+# VITE_DEPLOYMENT_ENV: 'docker-compose' | 'k8s' | 'cloudfront'
+# - docker-compose: 각 서비스별 포트로 직접 접근
+# - k8s (기본값): Ingress가 라우팅 처리 (상대 경로 사용)
+# - cloudfront: 별도 API 도메인 사용
+ARG VITE_DEPLOYMENT_ENV=k8s
+ARG VITE_API_BASE_URL=
+ARG VITE_API_DOMAIN=
+ENV VITE_DEPLOYMENT_ENV=${VITE_DEPLOYMENT_ENV}
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_API_DOMAIN=${VITE_API_DOMAIN}
 
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./

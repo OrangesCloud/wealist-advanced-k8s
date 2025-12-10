@@ -1,36 +1,49 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 // 환경 변수 가져오기
-const INJECTED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const INJECTED_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const DEPLOYMENT_ENV = import.meta.env.VITE_DEPLOYMENT_ENV || 'k8s';
 
 // ============================================================================
-// 💡 [핵심 수정]: Context Path를 환경에 따라 조건부로 붙입니다.
+// 💡 환경별 API Base URL 설정
+// ============================================================================
+// VITE_DEPLOYMENT_ENV 값에 따라 API 호출 방식이 달라집니다:
+// - 'docker-compose': 각 서비스별 포트로 직접 접근 (NGINX 프록시)
+// - 'k8s': Ingress가 모든 라우팅 처리 (상대 경로 사용)
+// - 'cloudfront': 별도 API 도메인 사용 (프로덕션)
 // ============================================================================
 
 const getApiBaseUrl = (path: string): string => {
-  // 1. 환경 변수 주입 확인
-  if (INJECTED_API_BASE_URL) {
-    // 쉘 스크립트에서 VITE_API_BASE_URL='http://localhost'가 주입된 경우
-    const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
-
-    if (isLocalDevelopment) {
-      // 🔥 로컬 개발: 각 서비스별 포트 지정
-      // auth-service: refresh 호출이 '/refresh'만 사용하므로 context path 포함
-      if (path?.includes('/api/auth')) return `${INJECTED_API_BASE_URL}:8080/api/auth`; // auth-service
-      // user-service: 요청이 full path 사용 (/api/users/*, /api/workspaces/*, /api/profiles/*)
-      if (path?.includes('/api/users')) return `${INJECTED_API_BASE_URL}:8090`; // user-service
-      if (path?.includes('/api/workspaces')) return `${INJECTED_API_BASE_URL}:8090`; // user-service (workspaces)
-      if (path?.includes('/api/profiles')) return `${INJECTED_API_BASE_URL}:8090`; // user-service (profiles)
-      if (path?.includes('/api/boards')) return `${INJECTED_API_BASE_URL}:8000/api`;
-      if (path?.includes('/api/chats')) return `${INJECTED_API_BASE_URL}:8001${path}`;
-      if (path?.includes('/api/notifications')) return `${INJECTED_API_BASE_URL}:8002`;
-      if (path?.includes('/api/storage')) return `${INJECTED_API_BASE_URL}:8003/api`; // storage-service (base path only)
-    }
-
-    return `${INJECTED_API_BASE_URL}${path}`;
+  // docker-compose: 각 서비스별 포트 직접 접근 (로컬 개발용)
+  if (DEPLOYMENT_ENV === 'docker-compose') {
+    const baseUrl = INJECTED_API_BASE_URL || 'http://localhost';
+    if (path?.includes('/api/auth')) return `${baseUrl}:8080/api/auth`;
+    if (path?.includes('/api/users')) return `${baseUrl}:8090`;
+    if (path?.includes('/api/workspaces')) return `${baseUrl}:8090`;
+    if (path?.includes('/api/profiles')) return `${baseUrl}:8090`;
+    if (path?.includes('/api/boards')) return `${baseUrl}:8000/api`;
+    if (path?.includes('/api/chats')) return `${baseUrl}:8001${path}`;
+    if (path?.includes('/api/notifications')) return `${baseUrl}:8002`;
+    if (path?.includes('/api/storage')) return `${baseUrl}:8003/api`;
+    return `${baseUrl}${path}`;
   }
 
-  // 환경 변수가 없을 경우 (Fallback, CI/CD 실패 대비)
+  // k8s (Kind/EKS): Ingress가 모든 라우팅 처리 - 상대 경로 사용
+  if (DEPLOYMENT_ENV === 'k8s') {
+    // 상대 경로 반환 → 브라우저 origin 기준으로 요청
+    return path;
+  }
+
+  // cloudfront: 별도 API 도메인 사용 (프로덕션)
+  if (DEPLOYMENT_ENV === 'cloudfront') {
+    const apiDomain = import.meta.env.VITE_API_DOMAIN || 'https://api.wealist.co.kr';
+    return `${apiDomain}${path}`;
+  }
+
+  // fallback: 환경변수가 있으면 사용, 없으면 프로덕션 도메인
+  if (INJECTED_API_BASE_URL) {
+    return `${INJECTED_API_BASE_URL}${path}`;
+  }
   return `https://api.wealist.co.kr${path}`;
 };
 
