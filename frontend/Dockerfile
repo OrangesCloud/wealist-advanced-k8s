@@ -2,6 +2,13 @@
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# 빌드 타임 환경변수 (VITE_* 변수는 빌드 시점에 주입됨)
+# 기본값: localhost (로컬 K8s용)
+# 프로덕션: docker build --build-arg VITE_API_BASE_URL=https://api.wealist.co.kr
+ARG VITE_API_BASE_URL=http://localhost
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+
 RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
