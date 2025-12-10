@@ -15,9 +15,9 @@ services:
     image: wealist/auth-service:local
     container_name: wealist-auth-service-standalone
     ports:
-      - "8081:8090"
+      - "8080:8080"
     environment:
-      - SERVER_PORT=8090
+      - SERVER_PORT=8080
       - SPRING_PROFILES_ACTIVE=dev
       # Redis
       - SPRING_REDIS_HOST=host.docker.internal
@@ -30,16 +30,16 @@ services:
       # OAuth
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-your-google-client-id}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
-      - OAUTH2_CLIENT_REDIRECT_URI=http://localhost:8081/login/oauth2/code/google
+      - OAUTH2_CLIENT_REDIRECT_URI=http://localhost:8080/login/oauth2/code/google
       - OAUTH2_REDIRECT_URL_ENV=http://localhost:3000/oauth/callback
       # User Service URL
-      - USER_SERVICE_URL=http://host.docker.internal:8080
+      - USER_SERVICE_URL=http://host.docker.internal:8081
       # Java Options
       - JAVA_OPTS=-Xms128m -Xmx256m
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health/liveness"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3

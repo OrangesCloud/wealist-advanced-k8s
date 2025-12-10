@@ -3,16 +3,13 @@ kind: ConfigMap
 metadata:
   name: video-service-config
 data:
-  ENV: "prod"
-  PORT: "8085"
+  ENV: "dev"
+  PORT: "8004"
   SERVER_BASE_PATH: "/api/video"
-  LOG_LEVEL: "info"
-  # Redis (host/port only - password in secret)
-  REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
+  LOG_LEVEL: "debug"
+  REDIS_HOST: "redis"
   REDIS_PORT: "6379"
-  # Service URLs
-  AUTH_SERVICE_URL: "http://auth-service:8081"
-  USER_SERVICE_URL: "http://user-service:8080"
-  # LiveKit
-  LIVEKIT_HOST: "http://livekit.wealist-infra.svc.cluster.local:7880"
-  LIVEKIT_WS_URL: "ws://livekit.wealist-infra.svc.cluster.local:7880"
+  AUTH_SERVICE_URL: "http://auth-service:8080"
+  USER_SERVICE_URL: "http://user-service:8081/api/users"
+  LIVEKIT_HOST: "http://livekit:7880"
+  LIVEKIT_WS_URL: "ws://livekit:7880"

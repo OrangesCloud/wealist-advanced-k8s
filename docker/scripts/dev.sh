@@ -41,6 +41,10 @@ fi
 # Docker Compose 파일 경로
 COMPOSE_FILES="-f docker/compose/docker-compose.yml"
 
+# BuildKit 활성화 (cache mount 사용을 위해 필수)
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 # 환경변수 파일을 명시적으로 지정 (compose 파일 내 변수 치환용)
 ENV_FILE_OPTION="--env-file $ENV_FILE"
 
@@ -71,8 +75,8 @@ case $COMMAND in
         echo -e "${GREEN}✅ 개발 환경이 시작되었습니다.${NC}"
         echo -e "${BLUE}📊 서비스 접속 정보:${NC}"
         echo "   - Frontend:    http://localhost:3000"
-        echo "   - Auth API:    http://localhost:8080 (토큰 관리)"
-        echo "   - User API:    http://localhost:8090"
+        echo "   - Auth API:    http://localhost:8080 (OAuth2, JWT)"
+        echo "   - User API:    http://localhost:8081"
         echo "   - Board API:   http://localhost:8000"
         echo "   - Chat API:    http://localhost:8001"
         echo "   - Noti API:    http://localhost:8002"
@@ -90,7 +94,7 @@ case $COMMAND in
         echo -e ""
         echo -e "${BLUE}📚 Swagger 문서:${NC}"
         echo "   - Auth API:    http://localhost:8080/swagger-ui/index.html"
-        echo "   - User API:    http://localhost:8090/swagger-ui/index.html"
+        echo "   - User API:    http://localhost:8081/swagger/index.html"
         echo "   - Board API:   http://localhost:8000/swagger/index.html"
         echo "   - Chat API:    http://localhost:8001/swagger/index.html"
         echo "   - Noti API:    http://localhost:8002/swagger/index.html"

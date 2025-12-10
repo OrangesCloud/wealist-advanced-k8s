@@ -80,7 +80,6 @@ func main() {
 			zap.Error(err))
 		database.NewAsync(dbConfig, 5*time.Second)
 	} else {
-		database.SetDB(db) // 전역 DB 설정
 		logger.Info("Database connected successfully")
 
 		// Run auto migration
@@ -114,14 +113,14 @@ func main() {
 		logger.Info("Auth client initialized", zap.String("auth_api_url", cfg.AuthAPI.BaseURL))
 	}
 
-	// Setup router (DB는 database.GetDB()를 통해 전역에서 가져옴)
+	// Setup router
 	r := router.Setup(router.Config{
-		Logger:      logger,
-		JWTSecret:   cfg.JWT.Secret,
-		BasePath:    cfg.Server.BasePath,
-		CORSOrigins: cfg.CORS.AllowedOrigins,
-		S3Client:    s3Client,
-		AuthClient:  authClient,
+		DB:         db,
+		Logger:     logger,
+		JWTSecret:  cfg.JWT.Secret,
+		BasePath:   cfg.Server.BasePath,
+		S3Client:   s3Client,
+		AuthClient: authClient,
 	})
 
 	// Create HTTP server

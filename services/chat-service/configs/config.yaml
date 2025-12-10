@@ -14,8 +14,8 @@ redis:
   db: 0
 
 auth:
-  service_url: http://localhost:8090
+  service_url: http://localhost:8080
   secret_key: your-jwt-secret-key
 
 services:
-  user_service_url: http://localhost:8090/api/users
+  user_service_url: http://localhost:8081/api/users

@@ -15,17 +15,17 @@ services:
     image: wealist/user-service:local
     container_name: wealist-user-service-standalone
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
       - ENV=dev
-      - SERVER_PORT=8080
+      - SERVER_PORT=8081
       - LOG_LEVEL=debug
       # Database - host.docker.internal로 로컬 인프라에 연결
       - DATABASE_URL=postgresql://user_service:user_service_pass@host.docker.internal:5432/wealist_user_db?sslmode=disable
       # JWT
       - SECRET_KEY=dev-jwt-secret-key-change-in-production
       # Service URLs
-      - AUTH_SERVICE_URL=http://host.docker.internal:8090
+      - AUTH_SERVICE_URL=http://host.docker.internal:8080
       # S3/MinIO
       - S3_BUCKET=wealist-dev-files
       - S3_REGION=ap-northeast-2
@@ -36,7 +36,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8080/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "-O",
+          "/dev/null",
+          "http://localhost:8081/health",
+        ]
       interval: 30s
       timeout: 3s
       retries: 3

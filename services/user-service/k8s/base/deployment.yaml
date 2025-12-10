@@ -5,7 +5,7 @@ metadata:
   labels:
     app: user-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: user-service
@@ -18,22 +18,25 @@ spec:
         - name: user-service
           image: user-service:latest
           ports:
-            - containerPort: 8080
+            - containerPort: 8081
           envFrom:
             - configMapRef:
-                name: user-service-config
+                name: wealist-shared-config
             - secretRef:
-                name: user-service-secret
+                name: wealist-shared-secrets
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://user_service:user_service_password@postgres:5432/wealist_user_db?sslmode=disable"
           livenessProbe:
             httpGet:
               path: /health
-              port: 8080
+              port: 8081
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8080
+              port: 8081
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:

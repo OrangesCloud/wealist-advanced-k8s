@@ -5,7 +5,7 @@ metadata:
   labels:
     app: board-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: board-service
@@ -21,9 +21,12 @@ spec:
             - containerPort: 8000
           envFrom:
             - configMapRef:
-                name: board-service-config
+                name: wealist-shared-config
             - secretRef:
-                name: board-service-secret
+                name: wealist-shared-secrets
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://board_service:board_service_password@postgres:5432/wealist_board_db?sslmode=disable"
           livenessProbe:
             httpGet:
               path: /health/live
@@ -38,8 +41,8 @@ spec:
             periodSeconds: 5
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
+              memory: "128Mi"
+              cpu: "50m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "200m"

@@ -1,55 +1,70 @@
 package OrangeCloud.AuthService.controller;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.boot.actuate.health.HealthEndpoint;
+import org.springframework.boot.actuate.health.Status;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Health Check Controller for Kubernetes probes
+ * Health check endpoints for Kubernetes probes and docker-compose health checks.
+ * Provides /health (liveness) and /ready (readiness) endpoints
+ * that are consistent with Go services.
  */
 @RestController
-@RequestMapping("/health")
 @RequiredArgsConstructor
 public class HealthController {
 
-    private final RedisConnectionFactory redisConnectionFactory;
+    private final HealthEndpoint healthEndpoint;
 
     /**
-     * Liveness probe - 앱이 살아있는지 확인
+     * Liveness probe - checks if the application is running.
+     * Returns 200 if the application is alive.
      */
-    @GetMapping("/live")
-    public ResponseEntity<Map<String, String>> liveness() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("service", "auth-service");
-        return ResponseEntity.ok(response);
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, String>> health() {
+        return ResponseEntity.ok(Map.of(
+                "status", "ok",
+                "service", "auth-service"
+        ));
     }
 
     /**
-     * Readiness probe - 앱이 트래픽을 받을 준비가 됐는지 확인
+     * Readiness probe - checks if the application is ready to serve traffic.
+     * Checks Redis connection via Spring Boot Actuator health.
+     * Returns 200 if ready, 503 if not ready.
      */
     @GetMapping("/ready")
-    public ResponseEntity<Map<String, Object>> readiness() {
-        Map<String, Object> response = new HashMap<>();
-        response.put("service", "auth-service");
-        
+    public ResponseEntity<Map<String, Object>> ready() {
         try {
-            // Redis 연결 확인
-            redisConnectionFactory.getConnection().ping();
-            response.put("status", "UP");
-            response.put("redis", "connected");
-            return ResponseEntity.ok(response);
+            var health = healthEndpoint.health();
+            boolean isUp = Status.UP.equals(health.getStatus());
+
+            if (isUp) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "ready",
+                        "service", "auth-service",
+                        "details", health.getStatus().getCode()
+                ));
+            } else {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of(
+                                "status", "not_ready",
+                                "service", "auth-service",
+                                "details", health.getStatus().getCode()
+                        ));
+            }
         } catch (Exception e) {
-            response.put("status", "DOWN");
-            response.put("redis", "disconnected");
-            response.put("error", e.getMessage());
-            return ResponseEntity.status(503).body(response);
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of(
+                            "status", "not_ready",
+                            "service", "auth-service",
+                            "error", e.getMessage()
+                    ));
         }
     }
 }

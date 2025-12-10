@@ -2,12 +2,14 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	// swaggerFiles "github.com/swaggo/files"
 	// ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 
+	commonmw "github.com/OrangesCloud/wealist-advanced-go-pkg/middleware"
 	"user-service/internal/client"
-	"user-service/internal/database"
 	"user-service/internal/handler"
 	"user-service/internal/middleware"
 	"user-service/internal/repository"
@@ -16,6 +18,7 @@ import (
 
 // Config holds router configuration
 type Config struct {
+	DB         *gorm.DB
 	Logger     *zap.Logger
 	JWTSecret  string
 	BasePath   string
@@ -27,22 +30,31 @@ type Config struct {
 func Setup(cfg Config) *gin.Engine {
 	r := gin.New()
 
-	// Middleware
-	r.Use(gin.Recovery())
-	r.Use(middleware.Logger(cfg.Logger))
-	r.Use(middleware.CORS("*"))
-	r.Use(middleware.Metrics()) // Prometheus metrics middleware
+	// Middleware (using common package)
+	r.Use(commonmw.Recovery(cfg.Logger))
+	r.Use(commonmw.Logger(cfg.Logger))
+	r.Use(commonmw.DefaultCORS())
+	r.Use(commonmw.Metrics())
 
 	// Prometheus metrics endpoint
-	r.GET("/metrics", middleware.MetricsHandler())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Health check routes
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "healthy", "service": "user-service"})
 	})
 	r.GET("/ready", func(c *gin.Context) {
-		if !database.IsConnected() {
-			c.JSON(503, gin.H{"status": "not ready", "reason": "database not connected", "service": "user-service"})
+		if cfg.DB == nil {
+			c.JSON(503, gin.H{"status": "not ready", "service": "user-service"})
+			return
+		}
+		sqlDB, err := cfg.DB.DB()
+		if err != nil {
+			c.JSON(503, gin.H{"status": "not ready", "service": "user-service"})
+			return
+		}
+		if err := sqlDB.Ping(); err != nil {
+			c.JSON(503, gin.H{"status": "not ready", "service": "user-service"})
 			return
 		}
 		c.JSON(200, gin.H{"status": "ready", "service": "user-service"})
@@ -51,14 +63,13 @@ func Setup(cfg Config) *gin.Engine {
 	// Swagger documentation (disabled for faster builds)
 	// r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Initialize repositories (DB는 전역에서 가져옴)
-	db := database.GetDB()
-	userRepo := repository.NewUserRepository(db)
-	workspaceRepo := repository.NewWorkspaceRepository(db)
-	memberRepo := repository.NewWorkspaceMemberRepository(db)
-	profileRepo := repository.NewUserProfileRepository(db)
-	joinReqRepo := repository.NewJoinRequestRepository(db)
-	attachmentRepo := repository.NewAttachmentRepository(db)
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(cfg.DB)
+	workspaceRepo := repository.NewWorkspaceRepository(cfg.DB)
+	memberRepo := repository.NewWorkspaceMemberRepository(cfg.DB)
+	profileRepo := repository.NewUserProfileRepository(cfg.DB)
+	joinReqRepo := repository.NewJoinRequestRepository(cfg.DB)
+	attachmentRepo := repository.NewAttachmentRepository(cfg.DB)
 
 	// Initialize services
 	userService := service.NewUserService(userRepo, cfg.Logger)

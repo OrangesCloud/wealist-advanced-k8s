@@ -14,7 +14,7 @@ redis:
   db: 0
 
 auth:
-  service_url: http://localhost:8090
+  service_url: http://localhost:8080
   secret_key: ""
 
 livekit:
@@ -24,4 +24,4 @@ livekit:
   ws_url: ws://localhost:7880
 
 services:
-  user_service_url: http://localhost:8080
+  user_service_url: http://localhost:8081

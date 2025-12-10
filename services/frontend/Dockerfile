@@ -1,30 +1,59 @@
-# frontend/Dockerfile (프로덕션용, 자동 빌드 보장)
+# syntax=docker/dockerfile:1.4
+# frontend/Dockerfile
+# Multi-stage build for local development and production
+#
+# Usage:
+#   Development (docker-compose): docker build --target development -t frontend:dev .
+#   Production: docker build -t frontend:prod .
+#
+# Environments:
+#   - local: docker-compose (development stage)
+#   - develop: Kind local K8s (production stage + ConfigMap)
+#   - prod: EKS (production stage + ConfigMap)
 
-FROM node:20-alpine AS builder
+# === Base Stage ===
+FROM node:20-alpine AS base
+WORKDIR /app
+ENV NPM_CONFIG_LOGLEVEL=warn
+RUN npm install -g pnpm
+
+# === Development Stage ===
+# For local development with hot reload (docker-compose)
+FROM base AS development
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+# Source code is mounted via docker-compose volumes
+# CMD is overridden in docker-compose.yml
+
+# === Builder Stage ===
+# Builds the production bundle
+FROM base AS builder
 WORKDIR /app
 
-# 빌드 타임 환경변수 (VITE_* 변수는 빌드 시점에 주입됨)
-# VITE_DEPLOYMENT_ENV: 'docker-compose' | 'k8s' | 'cloudfront'
-# - docker-compose: 각 서비스별 포트로 직접 접근
-# - k8s (기본값): Ingress가 라우팅 처리 (상대 경로 사용)
-# - cloudfront: 별도 API 도메인 사용
-ARG VITE_DEPLOYMENT_ENV=k8s
-ARG VITE_API_BASE_URL=
-ARG VITE_API_DOMAIN=
-ENV VITE_DEPLOYMENT_ENV=${VITE_DEPLOYMENT_ENV}
+# Build-time environment variable (fallback, can be overridden by runtime config)
+ARG VITE_API_BASE_URL=http://localhost
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
-ENV VITE_API_DOMAIN=${VITE_API_DOMAIN}
 
-RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 COPY . .
-# 빌드 실패 시 컨테이너 중단
 RUN pnpm run build || (echo "Build failed. Check Vite config or env vars." && exit 1)
 
-FROM nginx:stable-alpine
-EXPOSE 80
+# === Production Stage ===
+# Serves static files with nginx
+FROM nginx:stable-alpine AS production
+
+# Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
-# SPA 라우팅을 위한 nginx 설정
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy nginx config if exists
+# COPY docker/nginx.conf /etc/nginx/nginx.conf
+
+# Create config.js placeholder for runtime injection (K8s ConfigMap)
+# This file will be overwritten by ConfigMap mount in K8s
+RUN echo 'window.__ENV__ = { API_BASE_URL: "http://localhost" };' > /usr/share/nginx/html/config.js
+
+EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

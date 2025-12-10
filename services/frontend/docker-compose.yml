@@ -10,7 +10,8 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.local
+      dockerfile: Dockerfile
+      target: development
     image: wealist/frontend:local
     container_name: wealist-frontend-standalone
     ports:

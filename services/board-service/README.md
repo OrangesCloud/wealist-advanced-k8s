@@ -21,17 +21,17 @@ weAlist의 **보드 관리 마이크로서비스**로, 프로젝트 및 칸반 �
 
 ## 기술 스택
 
-| 분류 | 기술 |
-|------|------|
-| **언어** | Go 1.25+ |
-| **프레임워크** | Gin (HTTP), GORM (ORM) |
-| **데이터베이스** | PostgreSQL 17 |
-| **캐시** | Redis 7 |
-| **인증** | JWT (HS512) |
-| **로깅** | Uber Zap |
-| **문서화** | Swagger/OpenAPI |
-| **컨테이너** | Docker, Docker Compose |
-| **CI/CD** | GitHub Actions, AWS ECR |
+| 분류             | 기술                    |
+| ---------------- | ----------------------- |
+| **언어**         | Go 1.25+                |
+| **프레임워크**   | Gin (HTTP), GORM (ORM)  |
+| **데이터베이스** | PostgreSQL 17           |
+| **캐시**         | Redis 7                 |
+| **인증**         | JWT (HS512)             |
+| **로깅**         | Uber Zap                |
+| **문서화**       | Swagger/OpenAPI         |
+| **컨테이너**     | Docker, Docker Compose  |
+| **CI/CD**        | GitHub Actions, AWS ECR |
 
 ## 빠른 시작
 
@@ -73,6 +73,7 @@ docker compose -f docker/compose/docker-compose.dev.yml down -v
 ```
 
 **포트 접근:**
+
 - Board Service API: http://localhost:8000
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
@@ -80,6 +81,7 @@ docker compose -f docker/compose/docker-compose.dev.yml down -v
 - MinIO Console: http://localhost:9001
 
 **특징:**
+
 - ✅ user-service 의존성 없음
 - ✅ 모든 포트 직접 노출
 - ✅ 빠른 시작 (60초 이내)
@@ -126,28 +128,33 @@ open http://localhost:8000/swagger/index.html
 ## 주요 기능
 
 ### 프로젝트 관리
+
 - 워크스페이스별 프로젝트 생성 및 조회
 - 기본 프로젝트 자동 생성
 - 프로젝트 멤버 권한 관리 (OWNER/ADMIN/MEMBER)
 
 ### 보드 관리
+
 - 칸반 보드 CRUD (생성, 조회, 수정, 삭제)
 - Fractional Indexing 기반 순서 관리 (O(1) 위치 변경)
 - 커스텀 필드 지원 (Stage, Importance, Role)
 - Soft Delete로 데이터 복구 가능
 
 ### 협업 기능
+
 - 보드 참여자 관리 (추가/제거)
 - 댓글 작성 및 스레드
 - 파일 첨부 (S3 Presigned URL 방식)
 
 ### 실시간 동기화
+
 - WebSocket 기반 실시간 업데이트
 - 프로젝트별 채널 격리
 
 ## API 엔드포인트
 
 ### 기본 URL
+
 ```
 로컬: http://localhost:8000/api
 AWS:  https://api.wealist.co.kr/api/boards
@@ -155,21 +162,21 @@ AWS:  https://api.wealist.co.kr/api/boards
 
 ### 주요 엔드포인트
 
-| 기능 | 메서드 | 경로 | 설명 |
-|------|--------|------|------|
-| **프로젝트** | POST | `/projects` | 프로젝트 생성 |
-| | GET | `/projects/workspace/:id` | 워크스페이스 프로젝트 목록 |
-| **보드** | POST | `/boards` | 보드 생성 |
-| | GET | `/boards/:id` | 보드 상세 조회 |
-| | GET | `/boards/project/:id` | 프로젝트 보드 목록 |
-| | PUT | `/boards/:id` | 보드 수정 |
-| | PUT | `/boards/:id/move` | 보드 위치 이동 |
-| | DELETE | `/boards/:id` | 보드 삭제 (soft) |
-| **참여자** | POST | `/participants` | 참여자 추가 |
-| | GET | `/participants/board/:id` | 참여자 목록 |
-| **댓글** | POST | `/comments` | 댓글 작성 |
-| | GET | `/comments/board/:id` | 댓글 목록 |
-| **첨부파일** | POST | `/attachments/presigned-url` | 업로드 URL 생성 |
+| 기능         | 메서드 | 경로                         | 설명                       |
+| ------------ | ------ | ---------------------------- | -------------------------- |
+| **프로젝트** | POST   | `/projects`                  | 프로젝트 생성              |
+|              | GET    | `/projects/workspace/:id`    | 워크스페이스 프로젝트 목록 |
+| **보드**     | POST   | `/boards`                    | 보드 생성                  |
+|              | GET    | `/boards/:id`                | 보드 상세 조회             |
+|              | GET    | `/boards/project/:id`        | 프로젝트 보드 목록         |
+|              | PUT    | `/boards/:id`                | 보드 수정                  |
+|              | PUT    | `/boards/:id/move`           | 보드 위치 이동             |
+|              | DELETE | `/boards/:id`                | 보드 삭제 (soft)           |
+| **참여자**   | POST   | `/participants`              | 참여자 추가                |
+|              | GET    | `/participants/board/:id`    | 참여자 목록                |
+| **댓글**     | POST   | `/comments`                  | 댓글 작성                  |
+|              | GET    | `/comments/board/:id`        | 댓글 목록                  |
+| **첨부파일** | POST   | `/attachments/presigned-url` | 업로드 URL 생성            |
 
 **전체 API 문서**: [Swagger UI](http://localhost:8000/swagger/index.html) 참조
 
@@ -199,6 +206,7 @@ board-service/
 ```
 
 **계층 설명**:
+
 - **Handler**: HTTP 요청/응답 처리, DTO 검증
 - **Service**: 비즈니스 로직, 트랜잭션 관리
 - **Repository**: 데이터베이스 CRUD 연산
@@ -238,17 +246,20 @@ board-service/
 ### 핵심 설계 원칙
 
 #### 1. 서비스 독립성
+
 - ✅ **독립 데이터베이스**: 각 서비스가 전용 DB 소유
 - ✅ **No Foreign Keys**: 애플리케이션 레벨 관계 관리
 - ✅ **API 통신**: 서비스 간 RESTful API로만 통신
 - ✅ **독립 배포**: 서비스별 독립적 배포 및 버전 관리
 
 #### 2. Clean Architecture
+
 - **의존성 방향**: 외부 → 내부 (Handler → Service → Repository → Domain)
 - **인터페이스 기반**: 구현체 교체 가능 (테스트 용이)
 - **Rich Domain Model**: 비즈니스 로직을 도메인에 캡슐화 (26개 메서드)
 
 #### 3. 확장성
+
 - **무상태 설계**: 세션 없이 JWT 기반 인증
 - **수평 확장**: 인스턴스 추가로 처리량 증가
 - **샤딩 준비**: UUID 기반 분산 ID, FK 없음
@@ -282,6 +293,7 @@ docker compose -f docker/compose/docker-compose.dev.yml down
 ```
 
 **주요 특징:**
+
 - ✅ user-service 의존성 없음 - 독립적 개발 가능
 - ✅ 빠른 시작 - 60초 이내 모든 서비스 준비
 - ✅ 직접 포트 접근 - nginx 없이 API 직접 호출
@@ -342,7 +354,7 @@ CORS_ORIGINS=http://localhost:3000
 LOG_LEVEL=info          # debug, info, warn, error
 
 # S3 (첨부파일)
-S3_BUCKET=wealist-dev-files
+S3_BUCKET=wealist-local-files
 S3_REGION=ap-northeast-2
 ```
 
@@ -460,11 +472,11 @@ func (h *BoardHandler) CreateBoard(c *gin.Context) {
 
 weAlist는 **3가지 배포 환경**을 지원합니다:
 
-| 환경 | 용도 | 인프라 | 접근 방식 | 자동 배포 |
-|------|------|--------|-----------|----------|
-| **Local** | 개발/디버깅 | Docker Compose | `localhost:8000` | ❌ |
-| **EC2 Dev** | 통합 테스트 | EC2 단일 인스턴스 | `http://<EC2-IP>:8000` | ✅ CI/CD |
-| **Production** | 운영 서비스 | AWS ALB + ECS/EC2 | `https://api.wealist.co.kr/api/boards` | ⚠️ 수동 |
+| 환경           | 용도        | 인프라            | 접근 방식                              | 자동 배포 |
+| -------------- | ----------- | ----------------- | -------------------------------------- | --------- |
+| **Local**      | 개발/디버깅 | Docker Compose    | `localhost:8000`                       | ❌        |
+| **EC2 Dev**    | 통합 테스트 | EC2 단일 인스턴스 | `http://<EC2-IP>:8000`                 | ✅ CI/CD  |
+| **Production** | 운영 서비스 | AWS ALB + ECS/EC2 | `https://api.wealist.co.kr/api/boards` | ⚠️ 수동   |
 
 ---
 
@@ -473,6 +485,7 @@ weAlist는 **3가지 배포 환경**을 지원합니다:
 **목적**: 로컬 머신에서 board-service 독립 개발 및 디버깅
 
 **특징**:
+
 - ✅ user-service 의존성 없음
 - ✅ Kubernetes Pod 환경 시뮬레이션
 - ✅ 빠른 시작 (60초 이내)
@@ -493,6 +506,7 @@ docker compose -f docker/compose/docker-compose.dev.yml down
 ```
 
 **접속**:
+
 ```bash
 # API 직접 접근 (nginx 없음)
 curl http://localhost:8000/health
@@ -512,6 +526,7 @@ open http://localhost:9001
 ```
 
 **환경 변수** (`docker/env/.env.dev`):
+
 ```bash
 ENV=dev
 SERVER_BASE_PATH=""                    # ALB 없음
@@ -529,12 +544,14 @@ LOG_LEVEL=debug
 **목적**: 팀 통합 테스트 및 QA 환경
 
 **특징**:
+
 - ✅ CI/CD 자동 배포 (main 브랜치 푸시 시)
 - ✅ All-in-one 구성 (서비스 + DB + 모니터링)
 - ✅ 낮은 비용 (~$15-20/월, t3.small)
 - ⚠️ 프로덕션 사용 비권장
 
 **EC2 인스턴스에서 수동 배포**:
+
 ```bash
 # SSH 접속
 ssh ubuntu@<EC2-PUBLIC-IP>
@@ -556,6 +573,7 @@ docker-compose -f docker/compose/docker-compose.ec2-dev.yml logs -f board-servic
 ```
 
 **접속**:
+
 ```bash
 # EC2 Public IP로 접근
 curl http://<EC2-PUBLIC-IP>:8000/health
@@ -563,6 +581,7 @@ curl http://<EC2-PUBLIC-IP>:8000/api/boards/...
 ```
 
 **환경 변수**:
+
 ```bash
 ENV=dev
 SERVER_BASE_PATH=""                    # ALB 없음
@@ -578,6 +597,7 @@ USE_AUTO_MIGRATE=false                 # 수동 마이그레이션
 **목적**: 실제 운영 서비스
 
 **특징**:
+
 - ✅ AWS ALB를 통한 HTTPS 접근
 - ✅ RDS PostgreSQL (Multi-AZ)
 - ✅ ElastiCache Redis
@@ -585,6 +605,7 @@ USE_AUTO_MIGRATE=false                 # 수동 마이그레이션
 - ⚠️ 수동 배포 (Release Tag 생성 후)
 
 **접속**:
+
 ```bash
 # HTTPS로 접근 (ALB SSL Termination)
 curl https://api.wealist.co.kr/api/boards/health
@@ -592,6 +613,7 @@ curl https://api.wealist.co.kr/api/boards/api/projects/...
 ```
 
 **환경 변수**:
+
 ```bash
 ENV=prod
 SERVER_BASE_PATH="/api/boards"         # ALB 경로 재작성
@@ -603,6 +625,7 @@ LOG_LEVEL=warn                         # 프로덕션 로그 최소화
 ```
 
 **ALB Path-Based Routing**:
+
 ```
 클라이언트:  https://api.wealist.co.kr/api/boards/health
      ↓
@@ -612,6 +635,7 @@ Board Service: GET /health
 ```
 
 **배포 프로세스**:
+
 ```bash
 # 1. Release Tag 생성
 git tag -a v1.0.0 -m "Release v1.0.0"
@@ -776,12 +800,12 @@ gosec ./...
 
 ### 벤치마크 (t3.small, PostgreSQL RDS)
 
-| 엔드포인트 | 평균 응답시간 | P95 | RPS |
-|-----------|--------------|-----|-----|
-| GET /health | 2ms | 5ms | 5000+ |
-| GET /boards/:id | 15ms | 30ms | 800+ |
-| POST /boards | 25ms | 50ms | 500+ |
-| GET /boards/project/:id | 20ms | 40ms | 600+ |
+| 엔드포인트              | 평균 응답시간 | P95  | RPS   |
+| ----------------------- | ------------- | ---- | ----- |
+| GET /health             | 2ms           | 5ms  | 5000+ |
+| GET /boards/:id         | 15ms          | 30ms | 800+  |
+| POST /boards            | 25ms          | 50ms | 500+  |
+| GET /boards/project/:id | 20ms          | 40ms | 600+  |
 
 ### 최적화 전략
 

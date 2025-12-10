@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
+	commonmw "github.com/OrangesCloud/wealist-advanced-go-pkg/middleware"
 	"project-board-api/internal/client"
 	"project-board-api/internal/converter"
 	"project-board-api/internal/database"
@@ -38,12 +39,11 @@ func Setup(cfg Config) *gin.Engine {
 	// Create Gin router
 	router := gin.New()
 
-	// Apply global middleware chain
+	// Apply global middleware chain (using common package)
 	router.Use(
-		middleware.Recovery(cfg.Logger), // 1. Panic recovery
-		middleware.RequestID(),          // 2. Request ID tracking
-		middleware.Logger(cfg.Logger),   // 3. Request logging
-		middleware.CORS(),               // 4. CORS configuration
+		commonmw.Recovery(cfg.Logger), // 1. Panic recovery
+		commonmw.Logger(cfg.Logger),   // 2. Request logging (includes request ID)
+		commonmw.DefaultCORS(),        // 3. CORS configuration (includes X-Workspace-Id)
 	)
 
 	// Add metrics middleware if metrics is configured
@@ -123,10 +123,9 @@ func Setup(cfg Config) *gin.Engine {
 	// Setup API routes
 	setupRoutes(baseGroup, cfg.JWTSecret, projectHandler, boardHandler, participantHandler, commentHandler, fieldOptionHandler, projectMemberHandler, projectJoinRequestHandler, attachmentHandler)
 
-	// 🔥 [중요] WebSocket은 baseGroup을 사용하되 인증 미들웨어 없이 직접 등록
-	// basePath가 /api/boards일 때: /api/boards/api/ws/project/:projectId
-	wsGroup := baseGroup.Group("/api")
-	wsGroup.GET("/ws/project/:projectId", wsHandler.HandleWebSocket)
+	// 🔥 [중요] WebSocket은 baseGroup에 직접 등록 (chat-service와 동일한 패턴)
+	// basePath가 /api/boards일 때: /api/boards/ws/project/:projectId
+	baseGroup.GET("/ws/project/:projectId", wsHandler.HandleWebSocket)
 
 	return router
 }
@@ -150,11 +149,22 @@ func readinessHandler(db *gorm.DB) gin.HandlerFunc {
 		checks := gin.H{}
 		isReady := true
 
-		// Check database connection using global DB instance
-		if !database.IsConnected() {
+		// Check database connection
+		sqlDB, err := db.DB()
+		if err != nil {
 			c.JSON(503, gin.H{
 				"status":   "not_ready",
-				"database": "not_connected",
+				"database": "error",
+				"error":    err.Error(),
+			})
+			return
+		}
+
+		if err := sqlDB.Ping(); err != nil {
+			c.JSON(503, gin.H{
+				"status":   "not_ready",
+				"database": "disconnected",
+				"error":    err.Error(),
 			})
 			return
 		}

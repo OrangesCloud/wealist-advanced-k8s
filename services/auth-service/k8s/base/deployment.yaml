@@ -5,7 +5,7 @@ metadata:
   labels:
     app: auth-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: auth-service
@@ -18,22 +18,22 @@ spec:
         - name: auth-service
           image: auth-service:latest
           ports:
-            - containerPort: 8081
+            - containerPort: 8080
           envFrom:
             - configMapRef:
-                name: auth-service-config
+                name: wealist-shared-config
             - secretRef:
-                name: auth-service-secret
+                name: wealist-shared-secrets
           livenessProbe:
             httpGet:
-              path: /health/live
-              port: 8081
+              path: /health
+              port: 8080
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /health/ready
-              port: 8081
+              path: /ready
+              port: 8080
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:

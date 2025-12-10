@@ -64,10 +64,10 @@ echo "✅ Storage 서비스 데이터베이스 생성 완료: ${STORAGE_DB_NAME}
 # Video Service Database
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
     CREATE DATABASE ${VIDEO_DB_NAME:-wealist_video_db};
-    CREATE USER ${VIDEO_DB_USER:-video_user} WITH PASSWORD '${VIDEO_DB_PASSWORD:-video_password}';
-    GRANT ALL PRIVILEGES ON DATABASE ${VIDEO_DB_NAME:-wealist_video_db} TO ${VIDEO_DB_USER:-video_user};
+    CREATE USER ${VIDEO_DB_USER:-video_service} WITH PASSWORD '${VIDEO_DB_PASSWORD:-video_service_password}';
+    GRANT ALL PRIVILEGES ON DATABASE ${VIDEO_DB_NAME:-wealist_video_db} TO ${VIDEO_DB_USER:-video_service};
     \c ${VIDEO_DB_NAME:-wealist_video_db}
-    GRANT ALL ON SCHEMA public TO ${VIDEO_DB_USER:-video_user};
+    GRANT ALL ON SCHEMA public TO ${VIDEO_DB_USER:-video_service};
 EOSQL
 
 echo "✅ Video 서비스 데이터베이스 생성 완료: ${VIDEO_DB_NAME:-wealist_video_db}"

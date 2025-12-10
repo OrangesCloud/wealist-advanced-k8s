@@ -19,29 +19,28 @@ const getWebSocketUrl = (projectId: string, token: string): string => {
     const isLocalDevelopment = INJECTED_API_BASE_URL.includes('localhost');
 
     if (isLocalDevelopment) {
-      // Local: Board Service 직접 연결
-      return `ws://localhost:8000/api/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
+      // Local: Board Service 직접 연결 (chat-service와 동일한 패턴)
+      return `ws://localhost:8000/api/boards/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
     }
 
     // 운영: ALB를 통한 라우팅
     const protocol = INJECTED_API_BASE_URL.startsWith('https') ? 'wss:' : 'ws:';
     const host = INJECTED_API_BASE_URL.replace(/^https?:\/\//, '');
 
-    // 🔥 /api/boards/api/ws/project/{projectId}
-    return `${protocol}//${host}/api/boards/api/ws/project/${projectId}?token=${encodeURIComponent(
+    // 🔥 /api/boards/ws/project/{projectId} (chat-service와 동일한 패턴)
+    return `${protocol}//${host}/api/boards/ws/project/${projectId}?token=${encodeURIComponent(
       token,
     )}`;
   }
 
   // Fallback (환경 변수 없을 때)
-  // const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.host;
 
   if (host.includes('localhost') || host.includes('127.0.0.1')) {
-    return `ws://localhost:8000/api/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
+    return `ws://localhost:8000/api/boards/ws/project/${projectId}?token=${encodeURIComponent(token)}`;
   }
 
-  return `wss://api.wealist.co.kr/api/boards/api/ws/project/${projectId}?token=${encodeURIComponent(
+  return `wss://api.wealist.co.kr/api/boards/ws/project/${projectId}?token=${encodeURIComponent(
     token,
   )}`;
 };

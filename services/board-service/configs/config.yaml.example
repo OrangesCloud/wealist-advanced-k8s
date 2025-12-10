@@ -98,7 +98,7 @@ redis:
 # 로컬 환경: ~/.aws/credentials 사용 (access_key, secret_key 불필요)
 # MinIO 사용 시에만 endpoint, access_key, secret_key 필요
 s3:
-  bucket: "wealist-dev-files"
+  bucket: "wealist-local-files"
   region: "ap-northeast-2"
   # endpoint: "http://localhost:9000"  # MinIO 사용 시에만 설정
   # access_key: "minioadmin"           # MinIO 사용 시에만 설정

@@ -3,10 +3,5 @@ kind: ConfigMap
 metadata:
   name: frontend-config
 data:
-  # NOTE: VITE_* 환경변수는 빌드 타임에 번들에 포함됩니다.
-  # 이 ConfigMap은 문서화 목적이며, 실제 값은 Dockerfile 빌드 시 --build-arg로 전달합니다.
-  # 환경별 빌드: make build-frontend 또는 docker build --build-arg VITE_DEPLOYMENT_ENV=k8s
-  VITE_DEPLOYMENT_ENV: "k8s"  # 'docker-compose' | 'k8s' | 'cloudfront'
-  VITE_API_BASE_URL: ""       # k8s: 비워둠 (상대 경로 사용)
-  VITE_API_DOMAIN: ""         # cloudfront 환경에서만 사용
+  VITE_API_URL: "/api"
   VITE_WS_URL: "/ws"

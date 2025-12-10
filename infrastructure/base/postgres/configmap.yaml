@@ -7,7 +7,7 @@ data:
     #!/bin/bash
     set -e
 
-    # Create databases for each service (matching .env.dev.example)
+    # Create databases for each service
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
         -- Create databases
         CREATE DATABASE wealist_user_db;
@@ -17,7 +17,7 @@ data:
         CREATE DATABASE wealist_storage_db;
         CREATE DATABASE wealist_video_db;
 
-        -- Create users for each service (passwords match .env.dev.example)
+        -- Create users for each service
         CREATE USER user_service WITH PASSWORD 'user_service_password';
         CREATE USER board_service WITH PASSWORD 'board_service_password';
         CREATE USER chat_service WITH PASSWORD 'chat_service_password';
@@ -36,12 +36,12 @@ data:
 
     # Grant schema privileges for each database
     for db in wealist_user_db wealist_board_db wealist_chat_db wealist_noti_db wealist_storage_db wealist_video_db; do
-        # Extract service name: wealist_user_db -> user_service
-        service_name=$(echo "$db" | sed 's/wealist_//' | sed 's/_db/_service/')
+        user="${db#wealist_}"
+        user="${user%_db}_service"
         psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" -d "$db" <<-EOSQL
-            GRANT ALL ON SCHEMA public TO $service_name;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $service_name;
-            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $service_name;
+            GRANT ALL ON SCHEMA public TO $user;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $user;
+            ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $user;
     EOSQL
     done
 

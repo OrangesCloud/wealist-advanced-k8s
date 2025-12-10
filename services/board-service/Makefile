@@ -165,7 +165,7 @@ docker-run:
 	@echo "Running Docker container..."
 	@docker run -d \
 		--name $(APP_NAME) \
-		-p 8080:8080 \
+		-p 8000:8000 \
 		--env-file .env \
 		$(DOCKER_IMAGE)
 	@echo "✓ Container started: $(APP_NAME)"
@@ -174,7 +174,7 @@ docker-run:
 docker-run-interactive:
 	@echo "Running Docker container (interactive)..."
 	@docker run -it --rm \
-		-p 8080:8080 \
+		-p 8000:8000 \
 		--env-file .env \
 		$(DOCKER_IMAGE)
 

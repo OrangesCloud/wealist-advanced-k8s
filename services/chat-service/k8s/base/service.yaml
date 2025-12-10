@@ -7,8 +7,8 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 8083
-      targetPort: 8083
+    - port: 8001
+      targetPort: 8001
       protocol: TCP
   selector:
     app: chat-service

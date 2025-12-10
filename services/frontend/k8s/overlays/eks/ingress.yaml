@@ -18,18 +18,18 @@ spec:
                 name: frontend
                 port:
                   number: 80
-          - path: /api/users
-            pathType: Prefix
-            backend:
-              service:
-                name: user-service
-                port:
-                  number: 8080
           - path: /api/auth
             pathType: Prefix
             backend:
               service:
                 name: auth-service
+                port:
+                  number: 8080
+          - path: /api/users
+            pathType: Prefix
+            backend:
+              service:
+                name: user-service
                 port:
                   number: 8081
           - path: /api/boards
@@ -38,18 +38,18 @@ spec:
               service:
                 name: board-service
                 port:
-                  number: 8082
+                  number: 8000
           - path: /api/chats
             pathType: Prefix
             backend:
               service:
                 name: chat-service
                 port:
-                  number: 8083
+                  number: 8001
           - path: /api/notifications
             pathType: Prefix
             backend:
               service:
                 name: noti-service
                 port:
-                  number: 8084
+                  number: 8002

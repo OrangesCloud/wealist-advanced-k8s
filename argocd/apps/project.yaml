@@ -6,15 +6,15 @@ metadata:
 spec:
   description: Wealist Project
   sourceRepos:
-    - '*'
+    - "*"
   destinations:
     - namespace: wealist-dev
       server: https://kubernetes.default.svc
     - namespace: wealist-prod
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
-    - group: ''
+    - group: ""
       kind: Namespace
   namespaceResourceWhitelist:
-    - group: '*'
-      kind: '*'
+    - group: "*"
+      kind: "*"

@@ -38,11 +38,11 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_password}
 
       # Auth Service (standalone 모드에서는 JWT 로컬 검증 사용)
-      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-}
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL:-http://host.docker.internal:8080}
       - SECRET_KEY=${SECRET_KEY:-your-super-secret-jwt-key-change-this-in-production-min-32-chars}
 
       # User Service (optional)
-      - USER_SERVICE_URL=${USER_SERVICE_URL:-}
+      - USER_SERVICE_URL=${USER_SERVICE_URL:-http://host.docker.internal:8081}
 
       # CORS Configuration
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
@@ -55,6 +55,9 @@ services:
 
     networks:
       - video-net
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     depends_on:
       postgres:

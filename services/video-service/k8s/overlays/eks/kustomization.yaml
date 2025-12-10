@@ -28,7 +28,7 @@ patches:
         value: "info"
       - op: replace
         path: /data/AUTH_SERVICE_URL
-        value: "http://auth-service:8081"
+        value: "http://auth-service:8080"
       - op: replace
         path: /data/LIVEKIT_HOST
         value: "http://livekit:7880"

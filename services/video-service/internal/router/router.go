@@ -9,9 +9,12 @@ import (
 	"video-service/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
+
+	commonmw "github.com/OrangesCloud/wealist-advanced-go-pkg/middleware"
 )
 
 func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *zap.Logger) *gin.Engine {
@@ -20,10 +23,12 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	}
 
 	r := gin.New()
-	r.Use(gin.Recovery())
-	r.Use(middleware.LoggerMiddleware(logger))
-	r.Use(middleware.MetricsMiddleware()) // Prometheus metrics
-	// Note: CORS is handled by NGINX, not here (to avoid duplicate headers)
+
+	// Middleware (using common package)
+	r.Use(commonmw.Recovery(logger))
+	r.Use(commonmw.Logger(logger))
+	r.Use(commonmw.DefaultCORS())
+	r.Use(commonmw.Metrics())
 
 	// Initialize repositories
 	roomRepo := repository.NewRoomRepository(db)
@@ -50,7 +55,7 @@ func Setup(cfg *config.Config, db *gorm.DB, redisClient *redis.Client, logger *z
 	// Health endpoints (no auth)
 	r.GET("/health", healthHandler.Health)
 	r.GET("/ready", healthHandler.Ready)
-	r.GET("/metrics", middleware.MetricsHandler()) // Prometheus metrics
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// API routes with base path
 	api := r.Group(cfg.Server.BasePath)

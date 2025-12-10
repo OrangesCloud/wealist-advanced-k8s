@@ -28,9 +28,9 @@ services:
       # JWT
       - SECRET_KEY=dev-jwt-secret-key-change-in-production
       # Service URLs
-      - USER_SERVICE_URL=http://host.docker.internal:8080
-      - AUTH_SERVICE_URL=http://host.docker.internal:8090
-      - NOTI_SERVICE_URL=http://host.docker.internal:8084
+      - USER_SERVICE_URL=http://host.docker.internal:8081
+      - AUTH_SERVICE_URL=http://host.docker.internal:8080
+      - NOTI_SERVICE_URL=http://host.docker.internal:8002
       - INTERNAL_API_KEY=internal-secret-key
       # S3/MinIO
       - S3_BUCKET=wealist-dev-files
@@ -42,7 +42,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "-O", "/dev/null", "http://localhost:8000/health"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "-O",
+          "/dev/null",
+          "http://localhost:8000/health",
+        ]
       interval: 30s
       timeout: 3s
       retries: 3

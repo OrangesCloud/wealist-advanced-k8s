@@ -1,0 +1,45 @@
+# =============================================================================
+# Kustomization - Production Environment (EKS)
+# =============================================================================
+# 적용: kubectl apply -k k8s/overlays/prod
+#
+# 이 overlay는 EKS 프로덕션용 설정입니다.
+# - namespace: wealist-prod
+# - 리소스 제한: 높음
+# - 로그 레벨: info
+#
+# 주의: 프로덕션에서는 Secret을 External Secrets로 관리하세요!
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: wealist-prod
+
+resources:
+  - ../../base/namespace-prod
+  - ../../base/shared
+
+labels:
+  - pairs:
+      app.kubernetes.io/env: production
+    includeSelectors: false
+
+# ConfigMap 값 오버라이드
+patches:
+  - target:
+      kind: ConfigMap
+      name: wealist-shared-config
+    patch: |-
+      - op: replace
+        path: /data/ENV
+        value: "prod"
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: "info"
+      # Production URLs (EKS internal DNS)
+      - op: replace
+        path: /data/S3_ENDPOINT
+        value: "https://s3.ap-northeast-2.amazonaws.com"
+      - op: replace
+        path: /data/S3_BUCKET
+        value: "wealist-prod-files"

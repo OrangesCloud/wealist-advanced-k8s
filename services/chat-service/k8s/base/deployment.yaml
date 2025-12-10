@@ -5,7 +5,7 @@ metadata:
   labels:
     app: chat-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: chat-service
@@ -18,28 +18,31 @@ spec:
         - name: chat-service
           image: chat-service:latest
           ports:
-            - containerPort: 8083
+            - containerPort: 8001
           envFrom:
             - configMapRef:
-                name: chat-service-config
+                name: wealist-shared-config
             - secretRef:
-                name: chat-service-secret
+                name: wealist-shared-secrets
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://chat_service:chat_service_password@postgres:5432/wealist_chat_db?sslmode=disable"
           livenessProbe:
             httpGet:
               path: /health
-              port: 8083
+              port: 8001
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8083
+              port: 8001
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
+              memory: "128Mi"
+              cpu: "50m"
             limits:
-              memory: "512Mi"
-              cpu: "500m"
+              memory: "256Mi"
+              cpu: "200m"

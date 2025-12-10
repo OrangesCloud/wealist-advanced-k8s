@@ -32,7 +32,7 @@ import { AxiosResponse } from 'axios';
  */
 export const getMyWorkspaces = async (): Promise<UserWorkspaceResponse[]> => {
   const response: AxiosResponse<UserWorkspaceResponse[]> = await userRepoClient.get(
-    '/workspaces/all',
+    '/api/workspaces/all',
   );
   console.log(response.data);
   return response.data;
@@ -45,7 +45,7 @@ export const getMyWorkspaces = async (): Promise<UserWorkspaceResponse[]> => {
  */
 export const getPublicWorkspaces = async (workspaceName: string): Promise<WorkspaceResponse[]> => {
   const response: AxiosResponse<WorkspaceResponse[]> = await userRepoClient.get(
-    `/workspaces/public/${workspaceName}`,
+    `/api/workspaces/public/${workspaceName}`,
   );
   return response.data;
 };
@@ -57,7 +57,7 @@ export const getPublicWorkspaces = async (workspaceName: string): Promise<Worksp
  */
 export const getWorkspace = async (workspaceId: string): Promise<WorkspaceResponse> => {
   const response: AxiosResponse<{ data: WorkspaceResponse }> = await userRepoClient.get(
-    `/workspaces/${workspaceId}`,
+    `/api/workspaces/${workspaceId}`,
   );
   return response.data.data; // data 필드 추출
 };
@@ -69,7 +69,7 @@ export const getWorkspace = async (workspaceId: string): Promise<WorkspaceRespon
  */
 export const createWorkspace = async (data: CreateWorkspaceRequest): Promise<WorkspaceResponse> => {
   const response: AxiosResponse<WorkspaceResponse> = await userRepoClient.post(
-    '/workspaces/create',
+    '/api/workspaces/create',
     data,
   );
   return response.data;
@@ -85,7 +85,7 @@ export const updateWorkspace = async (
   data: { workspaceName?: string; workspaceDescription?: string },
 ): Promise<WorkspaceResponse> => {
   const response: AxiosResponse<{ data: WorkspaceResponse }> = await userRepoClient.put(
-    `/workspaces/${workspaceId}`,
+    `/api/workspaces/${workspaceId}`,
     data,
   );
   return response.data.data; // data 필드 추출
@@ -96,7 +96,7 @@ export const updateWorkspace = async (
  * [API] DELETE /api/workspaces/{workspaceId}
  */
 export const deleteWorkspace = async (workspaceId: string): Promise<void> => {
-  await userRepoClient.delete(`/workspaces/${workspaceId}`);
+  await userRepoClient.delete(`/api/workspaces/${workspaceId}`);
 };
 
 /**
@@ -107,7 +107,7 @@ export const getWorkspaceSettings = async (
   workspaceId: string,
 ): Promise<WorkspaceSettingsResponse> => {
   const response: AxiosResponse<WorkspaceSettingsResponse> = await userRepoClient.get(
-    `/workspaces/${workspaceId}/settings`,
+    `/api/workspaces/${workspaceId}/settings`,
   );
   return response.data;
 };
@@ -121,7 +121,7 @@ export const updateWorkspaceSettings = async (
   data: UpdateWorkspaceSettingsRequest,
 ): Promise<WorkspaceSettingsResponse> => {
   const response: AxiosResponse<WorkspaceSettingsResponse> = await userRepoClient.put(
-    `/workspaces/${workspaceId}/settings`,
+    `/api/workspaces/${workspaceId}/settings`,
     data,
   );
   return response.data;
@@ -139,7 +139,7 @@ export const getWorkspaceMembers = async (
   workspaceId: string,
 ): Promise<WorkspaceMemberResponse[]> => {
   const response: AxiosResponse<WorkspaceMemberResponse[]> = await userRepoClient.get(
-    `/workspaces/${workspaceId}/members`,
+    `/api/workspaces/${workspaceId}/members`,
   );
   return response.data;
 };
@@ -150,7 +150,7 @@ export const getWorkspaceMembers = async (
  */
 export const getPendingMembers = async (workspaceId: string): Promise<JoinRequestResponse[]> => {
   const response: AxiosResponse<JoinRequestResponse[]> = await userRepoClient.get(
-    `/workspaces/${workspaceId}/pendingMembers`,
+    `/api/workspaces/${workspaceId}/pendingMembers`,
   );
   return response.data;
 };
@@ -160,7 +160,7 @@ export const getPendingMembers = async (workspaceId: string): Promise<JoinReques
  * [API] POST /api/workspaces/{workspaceId}/members/{userId}/approve
  */
 export const approveMember = async (workspaceId: string, userId: string): Promise<void> => {
-  await userRepoClient.post(`/workspaces/${workspaceId}/members/${userId}/approve`, {});
+  await userRepoClient.post(`/api/workspaces/${workspaceId}/members/${userId}/approve`, {});
 };
 
 /**
@@ -168,7 +168,7 @@ export const approveMember = async (workspaceId: string, userId: string): Promis
  * [API] POST /api/workspaces/{workspaceId}/members/{userId}/reject
  */
 export const rejectMember = async (workspaceId: string, userId: string): Promise<void> => {
-  await userRepoClient.post(`/workspaces/${workspaceId}/members/${userId}/reject`, {});
+  await userRepoClient.post(`/api/workspaces/${workspaceId}/members/${userId}/reject`, {});
 };
 
 /**
@@ -183,7 +183,7 @@ export const inviteUser = async (
   const data: InviteUserRequest = { email };
 
   const response: AxiosResponse<{ data: WorkspaceMemberResponse }> = await userRepoClient.post(
-    `/workspaces/${workspaceId}/members/invite`,
+    `/api/workspaces/${workspaceId}/members/invite`,
     data,
   );
   return response.data.data; // data 필드 추출
@@ -202,7 +202,7 @@ export const updateMemberRole = async (
   const data = { roleName };
 
   const response: AxiosResponse<{ data: WorkspaceMemberResponse }> = await userRepoClient.put(
-    `/workspaces/${workspaceId}/members/${memberId}/role`,
+    `/api/workspaces/${workspaceId}/members/${memberId}/role`,
     data,
   );
   return response.data.data; // data 필드 추출
@@ -213,7 +213,7 @@ export const updateMemberRole = async (
  * [API] DELETE /api/workspaces/{workspaceId}/members/{memberId}
  */
 export const removeMember = async (workspaceId: string, memberId: string): Promise<void> => {
-  await userRepoClient.delete(`/workspaces/${workspaceId}/members/${memberId}`);
+  await userRepoClient.delete(`/api/workspaces/${workspaceId}/members/${memberId}`);
 };
 
 /**
@@ -226,7 +226,7 @@ export const getJoinRequests = async (
   status?: string, // 'PENDING', 'APPROVED', 'REJECTED'
 ): Promise<JoinRequestResponse[]> => {
   const response: AxiosResponse<{ data: JoinRequestResponse[] }> = await userRepoClient.get(
-    `/workspaces/${workspaceId}/joinRequests`,
+    `/api/workspaces/${workspaceId}/joinRequests`,
     { params: { status } },
   );
   return response.data.data; // data 필드 추출
@@ -240,7 +240,7 @@ export const getJoinRequests = async (
 export const createJoinRequest = async (workspaceId: string): Promise<JoinRequestResponse> => {
   const data = { workspaceId };
   const response: AxiosResponse<JoinRequestResponse> = await userRepoClient.post(
-    '/workspaces/join-requests',
+    '/api/workspaces/join-requests',
     data,
   );
   console.log(response.data);
@@ -258,7 +258,7 @@ export const createJoinRequest = async (workspaceId: string): Promise<JoinReques
  * * Response: { data: UserProfileResponse }
  */
 export const getMyProfile = async (workspaceId: string): Promise<UserProfileResponse> => {
-  const response: AxiosResponse<UserProfileResponse> = await userRepoClient.get('/profiles/me', {
+  const response: AxiosResponse<UserProfileResponse> = await userRepoClient.get('/api/profiles/me', {
     headers: {
       'X-Workspace-Id': workspaceId,
     },
@@ -273,7 +273,7 @@ export const getMyProfile = async (workspaceId: string): Promise<UserProfileResp
  */
 export const getAllMyProfiles = async (): Promise<UserProfileResponse[]> => {
   const response: AxiosResponse<UserProfileResponse[]> = await userRepoClient.get(
-    '/profiles/all/me',
+    '/api/profiles/all/me',
   );
   console.log(response.data);
   return response.data;
@@ -286,7 +286,7 @@ export const getAllMyProfiles = async (): Promise<UserProfileResponse[]> => {
  */
 export const updateMyProfile = async (data: UpdateProfileRequest): Promise<UserProfileResponse> => {
   const response: AxiosResponse<{ data: UserProfileResponse }> = await userRepoClient.put(
-    '/profiles/me',
+    '/api/profiles/me',
     data,
   );
   return response.data.data; // data 필드 추출
@@ -302,7 +302,7 @@ export const updateMyProfile = async (data: UpdateProfileRequest): Promise<UserP
  */
 export const setDefaultWorkspace = async (workspaceId: string): Promise<void> => {
   const data = { workspaceId };
-  await userRepoClient.post('/workspaces/default', data);
+  await userRepoClient.post('/api/workspaces/default', data);
 };
 
 // ========================================
@@ -317,7 +317,7 @@ export const generateProfilePresignedUrl = async (
   data: PresignedUrlRequest,
 ): Promise<PresignedUrlResponse> => {
   const response: AxiosResponse<PresignedUrlResponse> = await userRepoClient.post(
-    '/profiles/me/image/presigned-url',
+    '/api/profiles/me/image/presigned-url',
     data,
   );
   return response.data;
@@ -332,7 +332,7 @@ export const saveProfileAttachmentMetadata = async (
   data: SaveAttachmentRequest,
 ): Promise<AttachmentResponse> => {
   const response: AxiosResponse<AttachmentResponse> = await userRepoClient.post(
-    '/profiles/me/image/attachment',
+    '/api/profiles/me/image/attachment',
     data,
   );
   return response.data;
@@ -353,7 +353,7 @@ export const updateProfileImage = async (
     attachmentId,
   };
   const response: AxiosResponse<UserProfileResponse> = await userRepoClient.put(
-    '/profiles/me/image',
+    '/api/profiles/me/image',
     data,
     {
       headers: {

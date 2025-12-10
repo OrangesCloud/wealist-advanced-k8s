@@ -9,14 +9,15 @@ data:
   SERVER_MODE: "release"
   LOG_LEVEL: "info"
   # Database
-  DB_HOST: "postgres.wealist-infra.svc.cluster.local"
+  DB_HOST: "postgres"
   DB_PORT: "5432"
-  DB_NAME: "wealist_board_db"
+  DB_NAME: "board_db"
   # Redis
-  REDIS_HOST: "redis.wealist-infra.svc.cluster.local"
+  REDIS_HOST: "redis"
   REDIS_PORT: "6379"
   # Service URLs
-  USER_SERVICE_URL: "http://user-service:8080"
+  USER_SERVICE_URL: "http://user-service:8081"
+  AUTH_SERVICE_URL: "http://auth-service:8080"
   # S3 (AWS - IAM Role 사용, Local에서는 MinIO로 오버라이드)
   S3_REGION: "ap-northeast-2"
   S3_BUCKET: "wealist-files"

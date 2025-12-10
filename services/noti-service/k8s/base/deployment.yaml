@@ -5,7 +5,7 @@ metadata:
   labels:
     app: noti-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: noti-service
@@ -18,22 +18,25 @@ spec:
         - name: noti-service
           image: noti-service:latest
           ports:
-            - containerPort: 8084
+            - containerPort: 8002
           envFrom:
             - configMapRef:
-                name: noti-service-config
+                name: wealist-shared-config
             - secretRef:
-                name: noti-service-secret
+                name: wealist-shared-secrets
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://noti_service:noti_service_password@postgres:5432/wealist_noti_db?sslmode=disable"
           livenessProbe:
             httpGet:
               path: /health
-              port: 8084
+              port: 8002
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ready
-              port: 8084
+              port: 8002
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:

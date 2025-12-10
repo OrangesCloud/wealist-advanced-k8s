@@ -40,7 +40,8 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/actuator/**",
-                                "/health/**",           // K8s health check
+                                "/health",
+                                "/ready",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-resources/**"

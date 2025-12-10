@@ -35,7 +35,7 @@ weAlist는 팀 협업을 위한 프로젝트 관리 플랫폼입니다. 워크�
 ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
 │ user-service │ │ auth-service │ │board-service │ │ chat-service │ │ noti-service │
 │   (Go)       │ │ (Spring)     │ │   (Go)       │ │   (Go)       │ │   (Go)       │
-│   :8080      │ │   :8090      │ │   :8000      │ │   :8001      │ │   :8002      │
+│   :8081      │ │   :8080      │ │   :8000      │ │   :8001      │ │   :8002      │
 └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
           │              │              │              │              │
           ▼              ▼              ▼              ▼              ▼
@@ -160,8 +160,8 @@ wealist-project-advanced/
 | 서비스              | 기술         | 포트 | 설명                                |
 | ------------------- | ------------ | ---- | ----------------------------------- |
 | **Frontend**        | React + Vite | 3000 | 웹 UI                               |
-| **Auth Service**    | Spring Boot  | 8090 | JWT 토큰 관리, OAuth 인증           |
-| **User Service**    | Go + Gin     | 8080 | 사용자, 워크스페이스 관리           |
+| **Auth Service**    | Spring Boot  | 8080 | JWT 토큰 관리, OAuth 인증           |
+| **User Service**    | Go + Gin     | 8081 | 사용자, 워크스페이스 관리           |
 | **Board Service**   | Go + Gin     | 8000 | 프로젝트, 보드, 댓글 관리           |
 | **Chat Service**    | Go + Gin     | 8001 | 실시간 채팅 (WebSocket)             |
 | **Noti Service**    | Go + Gin     | 8002 | 알림 관리 (SSE)                     |
@@ -276,8 +276,8 @@ make dev-down
 ./docker/scripts/generate-swagger.sh
 
 # 접속 URL
-# - User API: http://localhost:8080/swagger/index.html
-# - Auth API: http://localhost:8090/swagger-ui/index.html
+# - User API: http://localhost:8081/swagger/index.html
+# - Auth API: http://localhost:8080/swagger-ui/index.html
 # - Board API: http://localhost:8000/swagger/index.html
 # - Chat API: http://localhost:8001/swagger/index.html
 # - Noti API: http://localhost:8002/swagger/index.html
@@ -318,7 +318,7 @@ make build-all
 make k8s-apply-local
 
 # 3. 상태 확인
-kubectl get pods -n wealist-dev
+kubectl get pods -n wealist-local
 
 # 4. 삭제
 make k8s-delete-local

@@ -25,13 +25,13 @@ services:
     env_file:
       - ../env/.env.dev
     ports:
-      - "${USER_HOST_PORT:-8080}:8080"
+      - "${USER_HOST_PORT:-8081}:8081"
 
     environment:
       # Server Configuration
       - ENV=dev
-      - SERVER_PORT=8080
-      - USER_SERVICE_PORT=8080
+      - SERVER_PORT=8081
+      - USER_SERVICE_PORT=8081
       - LOG_LEVEL=debug
 
       # Database Configuration
@@ -41,7 +41,7 @@ services:
       - SECRET_KEY=${JWT_SECRET}
 
       # Service URLs
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - AUTH_SERVICE_URL=http://auth-service:8080
 
       # CORS Configuration
       - CORS_ORIGINS=${CORS_ORIGINS}
@@ -74,7 +74,7 @@ services:
           "--tries=1",
           "-O",
           "/dev/null",
-          "http://localhost:8080/health",
+          "http://localhost:8081/health",
         ]
       interval: 30s
       timeout: 3s
@@ -94,20 +94,18 @@ services:
     build:
       context: ../../services/auth-service
       dockerfile: Dockerfile
-      args:
-        CACHEBUST: ${CACHEBUST:-1}
     image: wealist/auth-service:${VERSION:-latest}
     container_name: wealist-auth-service
     hostname: auth-service
     env_file:
       - ../env/.env.dev
     ports:
-      - "${AUTH_HOST_PORT:-8090}:8090"
+      - "${AUTH_HOST_PORT:-8080}:8080"
 
     environment:
       # Server Configuration
-      - SERVER_PORT=8090
-      - AUTH_SERVICE_PORT=8090
+      - SERVER_PORT=8080
+      - AUTH_SERVICE_PORT=8080
       - APP_NAME=${APP_NAME:-wealist-auth}
 
       # Redis Configuration
@@ -127,7 +125,7 @@ services:
       - OAUTH2_REDIRECT_URL_ENV=${OAUTH2_REDIRECT_URL:-http://localhost:3000/oauth/callback}
 
       # User Service URL (OAuth 로그인 시 유저 조회/생성용)
-      - USER_SERVICE_URL=http://user-service:8080
+      - USER_SERVICE_URL=http://user-service:8081
 
       # Dev Settings
       - SPRING_PROFILES_ACTIVE=dev
@@ -146,18 +144,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      user-service:
-        condition: service_healthy
 
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "-q",
-          "--spider",
-          "http://localhost:8090/actuator/health/liveness",
-        ]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -201,8 +190,8 @@ services:
       - SECRET_KEY=${JWT_SECRET}
 
       # Service URLs
-      - USER_SERVICE_URL=http://user-service:8080
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - USER_SERVICE_URL=http://user-service:8081
+      - AUTH_SERVICE_URL=http://auth-service:8080
 
       # CORS Configuration
       - CORS_ORIGINS=${CORS_ORIGINS}
@@ -229,11 +218,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      auth-service:
-        condition: service_healthy
       minio:
-        condition: service_healthy
-      noti-service:
         condition: service_healthy
 
     healthcheck:
@@ -280,8 +265,8 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - USER_SERVICE_URL=http://user-service:8080/api/users
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - USER_SERVICE_URL=http://user-service:8081/api/users
+      - AUTH_SERVICE_URL=http://auth-service:8080
       - SECRET_KEY=${JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS}
 
@@ -294,8 +279,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      auth-service:
         condition: service_healthy
 
     healthcheck:
@@ -348,7 +331,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
 
       # Auth Service
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - AUTH_SERVICE_URL=http://auth-service:8080
       - SECRET_KEY=${JWT_SECRET}
 
       # Internal API Key
@@ -363,8 +346,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      auth-service:
         condition: service_healthy
 
     healthcheck:
@@ -418,7 +399,7 @@ services:
       - SECRET_KEY=${JWT_SECRET}
 
       # Service URLs
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - AUTH_SERVICE_URL=http://auth-service:8080
 
       # CORS Configuration
       - CORS_ORIGINS=${CORS_ORIGINS}
@@ -438,8 +419,6 @@ services:
 
     depends_on:
       postgres:
-        condition: service_healthy
-      auth-service:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -497,11 +476,11 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
 
       # Auth Service
-      - AUTH_SERVICE_URL=http://auth-service:8090
+      - AUTH_SERVICE_URL=http://auth-service:8080
       - SECRET_KEY=${JWT_SECRET}
 
       # User Service (base path for workspace validation)
-      - USER_SERVICE_URL=http://user-service:8080/api
+      - USER_SERVICE_URL=http://user-service:8081/api
 
       # CORS Configuration
       - CORS_ORIGINS=${CORS_ORIGINS}
@@ -521,8 +500,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      auth-service:
         condition: service_healthy
       livekit:
         condition: service_started
@@ -557,9 +534,9 @@ services:
     container_name: wealist-livekit
     hostname: livekit
     ports:
-      - "7880:7880"     # HTTP API & WebSocket
-      - "7881:7881"     # TCP for WebRTC
-      - "50000-50020:50000-50020/udp"  # UDP for WebRTC media (limited range for dev)
+      - "7880:7880" # HTTP API & WebSocket
+      - "7881:7881" # TCP for WebRTC
+      - "50000-50020:50000-50020/udp" # UDP for WebRTC media (limited range for dev)
 
     command: --config /etc/livekit.yaml
 
@@ -584,10 +561,10 @@ services:
     container_name: wealist-coturn
     hostname: coturn
     ports:
-      - "3478:3478"         # STUN/TURN UDP
-      - "3478:3478/udp"     # STUN/TURN UDP
-      - "5349:5349"         # STUN/TURN TLS
-      - "5349:5349/udp"     # STUN/TURN TLS UDP
+      - "3478:3478" # STUN/TURN UDP
+      - "3478:3478/udp" # STUN/TURN UDP
+      - "5349:5349" # STUN/TURN TLS
+      - "5349:5349/udp" # STUN/TURN TLS UDP
 
     volumes:
       - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
@@ -610,7 +587,8 @@ services:
   frontend-service:
     build:
       context: ../../services/frontend
-      dockerfile: Dockerfile.local
+      dockerfile: Dockerfile
+      target: development
     image: wealist/frontend:${VERSION:-latest}
     container_name: wealist-frontend
     hostname: frontend
@@ -628,16 +606,12 @@ services:
 
     environment:
       - NODE_ENV=development
-      - VITE_DEPLOYMENT_ENV=docker-compose
       - VITE_API_BASE_URL=http://localhost
       - LOG_LEVEL=debug
 
     networks:
       - frontend-net
       - backend-net
-
-    depends_on:
-      - nginx
 
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:5173/"]
@@ -683,7 +657,8 @@ services:
       - video-service
 
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
+      test:
+        ["CMD-SHELL", "wget -q --spider http://localhost:80/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 3
@@ -904,12 +879,12 @@ services:
       - prometheus-data:/prometheus
 
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
 
     networks:
       - monitoring-net

@@ -132,7 +132,7 @@ func getDefaultConfig() Config {
 			ExpireTime: 24 * time.Hour,
 		},
 		AuthAPI: AuthAPIConfig{
-			BaseURL: "http://localhost:8090",
+			BaseURL: "http://localhost:8080",
 			Timeout: 5 * time.Second,
 		},
 		CORS: CORSConfig{

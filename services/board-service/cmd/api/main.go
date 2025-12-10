@@ -108,51 +108,40 @@ func main() {
 	db, err := database.New(dbConfig)
 
 	if err != nil {
-		log.Warn("Failed to connect to database on startup, will retry in background", zap.Error(err))
-		database.NewAsync(dbConfig, 5*time.Second)
-	} else {
-		database.SetDB(db)
-		log.Info("Database connection established",
-			zap.String("host", cfg.Database.Host),
-			zap.String("database", cfg.Database.DBName),
-		)
+		log.Fatal("Failed to connect to database", zap.Error(err))
 	}
+
+	log.Info("Database connection established",
+		zap.String("host", cfg.Database.Host),
+		zap.String("database", cfg.Database.DBName),
+	)
 
 	// Initialize metrics with logger
 	log.Info("Initializing Prometheus metrics")
 	m := metrics.NewWithLogger(log.Logger)
 
-	// Initialize business collector (may be nil if db is not connected)
-	var businessCollector *metrics.BusinessMetricsCollector
+	// Register GORM callbacks for database metrics
+	database.RegisterMetricsCallbacks(db, m)
+	log.Info("GORM metrics callbacks registered")
 
-	// Only initialize DB-dependent components if database is connected
-	if db != nil {
-		// Register GORM callbacks for database metrics
-		database.RegisterMetricsCallbacks(db, m)
-		log.Info("GORM metrics callbacks registered")
+	// Start database stats collector
+	database.StartDBStatsCollector(db, m)
+	log.Info("Database stats collector started")
 
-		// Start database stats collector
-		database.StartDBStatsCollector(db, m)
-		log.Info("Database stats collector started")
+	// Initialize and start business metrics collector
+	businessCollector := metrics.NewBusinessMetricsCollector(db, m, log.Logger)
+	businessCollector.Start()
+	log.Info("Business metrics collector started")
 
-		// Initialize and start business metrics collector
-		businessCollector = metrics.NewBusinessMetricsCollector(db, m, log.Logger)
-		businessCollector.Start()
-		log.Info("Business metrics collector started")
-
-		// Run GORM auto-migration with retry logic
-		log.Info("Running GORM auto-migration with retry logic")
-		if err := database.SafeAutoMigrateWithRetry(db, log.Logger, 3); err != nil {
-			log.Warn("Failed to run auto-migration, will retry when database connects",
-				zap.Error(err),
-				zap.String("hint", "Check database connection and schema conflicts"),
-			)
-		} else {
-			log.Info("Database schema migration completed successfully")
-		}
-	} else {
-		log.Warn("Database not connected, skipping DB-dependent initialization")
+	// Run GORM auto-migration with retry logic
+	log.Info("Running GORM auto-migration with retry logic")
+	if err := database.SafeAutoMigrateWithRetry(db, log.Logger, 3); err != nil {
+		log.Fatal("Failed to run auto-migration",
+			zap.Error(err),
+			zap.String("hint", "Check database connection and schema conflicts"),
+		)
 	}
+	log.Info("Database schema migration completed successfully")
 
 	if err := database.InitRedis(*cfg, log.Logger); err != nil {
 		log.Fatal("Failed to connect to Redis", zap.Error(err))
@@ -280,12 +269,10 @@ func main() {
 		log.Info("Server shutdown completed, all in-flight requests completed")
 	}
 
-	// Stop business metrics collector (if initialized)
-	if businessCollector != nil {
-		log.Info("Stopping business metrics collector")
-		businessCollector.Stop()
-		log.Info("Business metrics collector stopped")
-	}
+	// Stop business metrics collector
+	log.Info("Stopping business metrics collector")
+	businessCollector.Stop()
+	log.Info("Business metrics collector stopped")
 
 	// Stop cron scheduler
 	log.Info("Stopping cleanup job scheduler")
@@ -293,14 +280,12 @@ func main() {
 	<-cronCtx.Done()
 	log.Info("Cleanup job scheduler stopped")
 
-	// Close database connection (if connected)
-	if db != nil {
-		log.Info("Closing database connection")
-		if err := database.Close(db); err != nil {
-			log.Error("Failed to close database connection", zap.Error(err))
-		} else {
-			log.Info("Database connection closed successfully")
-		}
+	// Close database connection
+	log.Info("Closing database connection")
+	if err := database.Close(db); err != nil {
+		log.Error("Failed to close database connection", zap.Error(err))
+	} else {
+		log.Info("Database connection closed successfully")
 	}
 
 	log.Info("Application stopped")

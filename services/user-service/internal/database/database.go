@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"gorm.io/driver/postgres"
@@ -11,38 +10,6 @@ import (
 
 	"user-service/internal/domain"
 )
-
-var (
-	globalDB *gorm.DB
-	dbMutex  sync.RWMutex
-)
-
-// GetDB returns the current database connection
-func GetDB() *gorm.DB {
-	dbMutex.RLock()
-	defer dbMutex.RUnlock()
-	return globalDB
-}
-
-// SetDB sets the global database connection
-func SetDB(db *gorm.DB) {
-	dbMutex.Lock()
-	defer dbMutex.Unlock()
-	globalDB = db
-}
-
-// IsConnected returns true if database is connected
-func IsConnected() bool {
-	db := GetDB()
-	if db == nil {
-		return false
-	}
-	sqlDB, err := db.DB()
-	if err != nil {
-		return false
-	}
-	return sqlDB.Ping() == nil
-}
 
 // Config holds database configuration
 type Config struct {
@@ -92,7 +59,6 @@ func NewAsync(cfg Config, retryInterval time.Duration) {
 		for {
 			db, err := New(cfg)
 			if err == nil {
-				SetDB(db) // 전역 DB 업데이트
 				// Run migrations
 				if err := AutoMigrate(db); err != nil {
 					fmt.Printf("Warning: Failed to run migrations: %v\n", err)

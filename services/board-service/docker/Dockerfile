@@ -1,5 +1,6 @@
+# syntax=docker/dockerfile:1.4
 # Builder stage
-FROM golang:1.25-bookworm AS builder 
+FROM golang:1.24-bookworm AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
@@ -7,21 +8,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends git ca-certific
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first (for layer caching)
 COPY go.mod go.sum ./
 
-# Download dependencies
-RUN go mod download
-
-# 💡 [필수] 종속성 정리: go.mod에 명시된 버전에 맞춰 모듈을 정리하고, 누락된 의존성을 확보합니다.
-RUN go mod tidy
+# Download dependencies with cache mount
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
 # Copy source code
 COPY . .
 
-# Build the application
-# 🚨 [최종 수정] -mod=readonly 대신 -mod=mod를 사용하여 빌드 시 종속성 그래프를 다시 확인하도록 강제합니다.
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod -ldflags="-w -s" -o board-api ./cmd/api
+# Build with cache mount (dramatically speeds up incremental builds)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o board-api ./cmd/api
 
 # Runtime stage
 FROM alpine:latest

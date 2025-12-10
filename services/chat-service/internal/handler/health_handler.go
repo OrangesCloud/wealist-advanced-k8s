@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"chat-service/internal/database"
 	"context"
 	"net/http"
 	"time"
@@ -34,18 +33,8 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
 
-	// Check database using global DB instance
-	if !database.IsConnected() {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"status": "not ready",
-			"error":  "database not connected",
-		})
-		return
-	}
-
-	// Additional ping check with context
-	db := database.GetDB()
-	sqlDB, err := db.DB()
+	// Check database
+	sqlDB, err := h.db.DB()
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "not ready",

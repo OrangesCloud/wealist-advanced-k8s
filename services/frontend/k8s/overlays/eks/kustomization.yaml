@@ -7,9 +7,6 @@ resources:
   - ../../base
   - ingress.yaml
 
-patchesStrategicMerge:
-  - configmap-patch.yaml
-
 images:
   - name: frontend
     newName: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/wealist/frontend
