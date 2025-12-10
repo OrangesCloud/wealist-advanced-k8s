@@ -21,3 +21,7 @@ make status
 
 kind get clusters (클러스터 확인)
 kubectl get namespaces (ns 확인)
+
+## 한꺼번에 클러스터 재설정
+
+make kind-delete && make kind-setup && make infra-setup && make k8s-deploy-services
