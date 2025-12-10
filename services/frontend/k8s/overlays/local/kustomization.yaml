@@ -8,8 +8,8 @@ resources:
 
 images:
   - name: frontend
-    newName: localhost:5001/frontend
-    newTag: v1
+    newName: frontend
+    newTag: local
 
 replicas:
   - name: frontend
