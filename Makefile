@@ -3,6 +3,7 @@
 # Kind cluster name (default: wealist)
 KIND_CLUSTER ?= wealist-project
 
+
 # Default target
 help:
 	@echo "Wealist Project - Available commands:"
@@ -134,6 +135,7 @@ kind-load-frontend:
 
 k8s-apply-local: kind-load-all
 	kubectl apply -f services/namespace.yaml
+
 	kubectl apply -k infrastructure/overlays/local
 	kubectl apply -k services/user-service/k8s/overlays/local
 	kubectl apply -k services/auth-service/k8s/overlays/local
